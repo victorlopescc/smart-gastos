@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import {
   Card,
   Text,
@@ -15,12 +15,16 @@ import {
 } from '@mantine/core'
 import { IconSearch, IconFilter, IconEdit, IconTrash } from '@tabler/icons-react'
 import { useDashboard } from '../../hooks/useDashboard'
+import { useReports } from '../../hooks/useReports'
+import { useAlerts } from '../../hooks/useAlerts'
 import { categories as categoryColors } from '../../data/mockData'
 import { createAmountChangeHandler, parseCurrencyToNumber } from '../../utils/formatters'
 import type { Expense } from '../../types'
 
 export function ExpenseHistoryScreen() {
-  const { addedExpenses, editExpense, deleteExpense } = useDashboard()
+  const { addedExpenses, editExpense, deleteExpense, getSubscriptionExpenses, monthlyData } = useDashboard()
+  const { setDashboardData, setExpenses } = useReports()
+  const { processExpenseAlerts } = useAlerts()
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [startDate, setStartDate] = useState('')
@@ -59,9 +63,50 @@ export function ExpenseHistoryScreen() {
     return category ? category.color : '#868E96'
   }
 
-  // Filtrar gastos baseado nos critérios - usando TODOS os gastos adicionados pelo usuário
+  // Integração automática com Reports e Alerts (invisível ao usuário)
+  useEffect(() => {
+    // Sincronizar dados do dashboard com reports
+    if (monthlyData) {
+      setDashboardData(monthlyData)
+    }
+  }, [monthlyData, setDashboardData])
+
+  // Sincronizar gastos com reports
+  useEffect(() => {
+    // Combinar gastos manuais com gastos de assinaturas para relatórios completos
+    const subscriptionExpenses = getSubscriptionExpenses()
+    const allExpenses = [...addedExpenses, ...subscriptionExpenses]
+    setExpenses(allExpenses)
+  }, [addedExpenses, setExpenses, getSubscriptionExpenses])
+
+  // Processar alertas quando gastos mudam
+  useEffect(() => {
+    if (addedExpenses.length > 0 && monthlyData) {
+      processExpenseAlerts(addedExpenses, monthlyData)
+    }
+  }, [addedExpenses, monthlyData, processExpenseAlerts])
+
+  // Função para obter histórico completo (gastos manuais + assinaturas)
+  const getCompleteExpenseHistory = useMemo(() => {
+    const subscriptionExpenses = getSubscriptionExpenses()
+    const allExpenses = [...addedExpenses, ...subscriptionExpenses]
+
+    // Adicionar flag para identificar origem (sem alterar visual)
+    return allExpenses.map(expense => ({
+      ...expense,
+      isSubscription: expense.id > 100000 // IDs de assinaturas são maiores que 100000
+    }))
+  }, [addedExpenses, getSubscriptionExpenses])
+
+  // Atualizar filteredExpenses para usar histórico completo quando não há filtros específicos
   const filteredExpenses = useMemo(() => {
-    let expenses: Expense[] = addedExpenses || []
+    // Se há filtros específicos, usar apenas gastos manuais para edição/exclusão
+    // Se não há filtros, mostrar histórico completo (incluindo assinaturas)
+    const baseExpenses = (searchTerm || categoryFilter || startDate || endDate)
+      ? addedExpenses || []
+      : getCompleteExpenseHistory
+
+    let expenses: Expense[] = Array.isArray(baseExpenses) ? baseExpenses : []
 
     // Filtro por termo de busca (descrição)
     if (searchTerm) {
@@ -100,7 +145,7 @@ export function ExpenseHistoryScreen() {
     return expenses.sort((a: Expense, b: Expense) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     )
-  }, [addedExpenses, searchTerm, categoryFilter, startDate, endDate])
+  }, [addedExpenses, getCompleteExpenseHistory, searchTerm, categoryFilter, startDate, endDate])
 
   const clearFilters = () => {
     setSearchTerm('')
@@ -267,22 +312,32 @@ export function ExpenseHistoryScreen() {
                       </Table.Td>
                       <Table.Td>
                         <Group gap="xs">
-                          <ActionIcon
-                            size="sm"
-                            color="#0ca167"
-                            variant="subtle"
-                            onClick={() => handleEditExpense(expense)}
-                          >
-                            <IconEdit size={16} />
-                          </ActionIcon>
-                          <ActionIcon
-                            size="sm"
-                            color="red"
-                            variant="subtle"
-                            onClick={() => handleDeleteExpense(expense)}
-                          >
-                            <IconTrash size={16} />
-                          </ActionIcon>
+                          {/* Só permitir edição/exclusão de gastos manuais, não de assinaturas */}
+                          {expense.id <= 100000 && (
+                            <>
+                              <ActionIcon
+                                size="sm"
+                                color="#0ca167"
+                                variant="subtle"
+                                onClick={() => handleEditExpense(expense)}
+                              >
+                                <IconEdit size={16} />
+                              </ActionIcon>
+                              <ActionIcon
+                                size="sm"
+                                color="red"
+                                variant="subtle"
+                                onClick={() => handleDeleteExpense(expense)}
+                              >
+                                <IconTrash size={16} />
+                              </ActionIcon>
+                            </>
+                          )}
+                          {expense.id > 100000 && (
+                            <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
+                              Assinatura
+                            </Text>
+                          )}
                         </Group>
                       </Table.Td>
                     </Table.Tr>
