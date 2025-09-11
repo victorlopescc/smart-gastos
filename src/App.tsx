@@ -4,6 +4,7 @@ import { Notifications } from '@mantine/notifications'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { SubscriptionsProvider } from './contexts/SubscriptionsContext'
 import { AlertsProvider } from './contexts/AlertsContext'
+import { ReportsProvider } from './contexts/ReportsContext'
 import { useTheme } from './hooks/useTheme'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { RegisterScreen } from './components/auth/RegisterScreen'
@@ -92,7 +93,9 @@ function App() {
     <ThemeProvider>
       <SubscriptionsProvider>
         <AlertsProvider>
-          <AppContent />
+          <ReportsProvider>
+            <AppContent />
+          </ReportsProvider>
         </AlertsProvider>
       </SubscriptionsProvider>
     </ThemeProvider>
