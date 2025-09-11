@@ -16,12 +16,14 @@ import {
   IconChartBar,
   IconUser,
   IconLogout,
+  IconPlus,
 } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useTheme } from '../../hooks/useTheme'
+import { GlobalAddExpenseModal } from './GlobalAddExpenseModal'
 import logoColor from '../../assets/images/logo_color.png'
 import logoWhite from '../../assets/images/logo_white.png'
-import React from "react";
+import React, { useState } from "react";
 
 interface AppLayoutProps {
   currentPage: string;
@@ -32,6 +34,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLayoutProps) {
   const [opened, { toggle, close }] = useDisclosure()
+  const [modalOpened, setModalOpened] = useState(false)
   const { isDark } = useTheme()
 
   const menuItems = [
@@ -84,27 +87,51 @@ export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLa
             </Box>
           </Group>
 
-          <Button
-            variant="subtle"
-            color="red"
-            size="sm"
-            onClick={handleLogout}
-            leftSection={<IconLogout size="1rem" />}
-            visibleFrom="sm"
-          >
-            Sair
-          </Button>
+          <Group>
+            <Button
+              variant="filled"
+              color="#0ca167"
+              size="sm"
+              onClick={() => setModalOpened(true)}
+              leftSection={<IconPlus size="1rem" />}
+              visibleFrom="sm"
+            >
+              Adicionar Gasto
+            </Button>
 
-          <Button
-            variant="subtle"
-            color="red"
-            size="sm"
-            onClick={handleLogout}
-            hiddenFrom="sm"
-            p="xs"
-          >
-            <IconLogout size="1rem" />
-          </Button>
+            <Button
+              variant="filled"
+              color="#0ca167"
+              size="sm"
+              onClick={() => setModalOpened(true)}
+              hiddenFrom="sm"
+              p="xs"
+            >
+              <IconPlus size="1rem" />
+            </Button>
+
+            <Button
+              variant="subtle"
+              color="red"
+              size="sm"
+              onClick={handleLogout}
+              leftSection={<IconLogout size="1rem" />}
+              visibleFrom="sm"
+            >
+              Sair
+            </Button>
+
+            <Button
+              variant="subtle"
+              color="red"
+              size="sm"
+              onClick={handleLogout}
+              hiddenFrom="sm"
+              p="xs"
+            >
+              <IconLogout size="1rem" />
+            </Button>
+          </Group>
         </Group>
       </AppShell.Header>
 
@@ -143,6 +170,11 @@ export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLa
       >
         {children}
       </AppShell.Main>
+
+      <GlobalAddExpenseModal
+        opened={modalOpened}
+        onClose={() => setModalOpened(false)}
+      />
     </AppShell>
   )
 }

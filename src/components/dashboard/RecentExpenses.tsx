@@ -1,12 +1,17 @@
-import { Card, Text, Table, Badge, ScrollArea, Button, Modal, TextInput, Select, Group, Box } from '@mantine/core'
-import { IconPlus } from '@tabler/icons-react'
+import { Card, Text, Table, Badge, ScrollArea, Button, Modal, TextInput, Select, Group, Box, ActionIcon } from '@mantine/core'
+import { IconPlus, IconEdit, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useDashboard } from '../../hooks/useDashboard'
 import { categories as categoryColors } from '../../data/mockData'
+import type { Expense } from '../../types'
 
 export function RecentExpenses() {
-  const { monthlyData, addExpense } = useDashboard()
+  const { monthlyData, addExpense, editExpense, deleteExpense } = useDashboard()
   const [opened, setOpened] = useState(false)
+  const [editOpened, setEditOpened] = useState(false)
+  const [deleteOpened, setDeleteOpened] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null)
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null)
   const [formData, setFormData] = useState({
     description: '',
     category: '',
@@ -60,6 +65,64 @@ export function RecentExpenses() {
     }
   }
 
+  const handleEditExpense = () => {
+    if (!editingExpense) return
+
+    console.log('Editando gasto:', editingExpense)
+    console.log('Dados do formulário:', formData)
+
+    // Remove formatação e converte para número
+    const amountValue = formData.amount.replace(/\D/g, '')
+    const amount = amountValue ? parseInt(amountValue) / 100 : 0
+
+    console.log('Valor convertido:', amount)
+
+    if (formData.description && formData.category && amount > 0) {
+      console.log('Chamando editExpense com:', {
+        id: editingExpense.id,
+        description: formData.description,
+        category: formData.category,
+        amount: amount,
+        date: formData.date
+      })
+
+      editExpense(editingExpense.id, {
+        description: formData.description,
+        category: formData.category,
+        amount: amount,
+        date: formData.date
+      })
+
+      setFormData({
+        description: '',
+        category: '',
+        amount: '',
+        date: new Date().toISOString().split('T')[0]
+      })
+      setEditOpened(false)
+      setEditingExpense(null)
+    } else {
+      console.log('Validação falhou:', {
+        description: formData.description,
+        category: formData.category,
+        amount: amount
+      })
+    }
+  }
+
+  const handleDeleteExpense = (expense: Expense) => {
+    setExpenseToDelete(expense)
+    setDeleteOpened(true)
+  }
+
+  const confirmDeleteExpense = () => {
+    if (expenseToDelete) {
+      deleteExpense(expenseToDelete.id)
+      setDeleteOpened(false)
+      setExpenseToDelete(null)
+    }
+  }
+
   const handleOpenModal = () => {
     setFormData({
       description: '',
@@ -68,6 +131,20 @@ export function RecentExpenses() {
       date: new Date().toISOString().split('T')[0]
     })
     setOpened(true)
+  }
+
+  const handleOpenEditModal = (expense: Expense) => {
+    setEditingExpense(expense)
+    setFormData({
+      description: expense.description,
+      category: expense.category,
+      amount: expense.amount.toLocaleString('pt-BR', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      }),
+      date: expense.date
+    })
+    setEditOpened(true)
   }
 
   const handleDescriptionChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -122,6 +199,7 @@ export function RecentExpenses() {
                 <Table.Th>Descrição</Table.Th>
                 <Table.Th>Categoria</Table.Th>
                 <Table.Th>Valor</Table.Th>
+                <Table.Th>Ações</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -135,11 +213,31 @@ export function RecentExpenses() {
                     </Badge>
                   </Table.Td>
                   <Table.Td c="red">{formatCurrency(expense.amount)}</Table.Td>
+                  <Table.Td>
+                    <Group gap="xs">
+                      <ActionIcon
+                        size="sm"
+                        color="#0ca167"
+                        variant="subtle"
+                        onClick={() => handleOpenEditModal(expense)}
+                      >
+                        <IconEdit size={16} />
+                      </ActionIcon>
+                      <ActionIcon
+                        size="sm"
+                        color="red"
+                        variant="subtle"
+                        onClick={() => handleDeleteExpense(expense)}
+                      >
+                        <IconTrash size={16} />
+                      </ActionIcon>
+                    </Group>
+                  </Table.Td>
                 </Table.Tr>
               ))}
               {monthlyData.recentExpenses.length === 0 && (
                 <Table.Tr>
-                  <Table.Td colSpan={4} style={{ textAlign: 'center', padding: '2rem' }}>
+                  <Table.Td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
                     <Text c="dimmed">Nenhum gasto registrado este mês</Text>
                   </Table.Td>
                 </Table.Tr>
@@ -160,6 +258,7 @@ export function RecentExpenses() {
         </Box>
       </Card>
 
+      {/* Modal para adicionar novo gasto */}
       <Modal
         opened={opened}
         onClose={() => setOpened(false)}
@@ -211,6 +310,102 @@ export function RecentExpenses() {
           </Button>
           <Button onClick={handleAddExpense} color="#0ca167">
             Adicionar Gasto
+          </Button>
+        </Group>
+      </Modal>
+
+      {/* Modal para editar gasto existente */}
+      <Modal
+        opened={editOpened}
+        onClose={() => setEditOpened(false)}
+        title="Editar Gasto"
+        size="md"
+        centered
+      >
+        <TextInput
+          label="Descrição"
+          placeholder="Ex: Supermercado, Uber, Restaurante..."
+          value={formData.description}
+          onChange={handleDescriptionChange}
+          mb="md"
+          required
+        />
+
+        <Select
+          label="Categoria"
+          placeholder="Selecione uma categoria"
+          data={categories}
+          value={formData.category}
+          onChange={handleCategoryChange}
+          mb="md"
+          required
+        />
+
+        <TextInput
+          label="Valor"
+          placeholder="0,00"
+          value={formData.amount}
+          onChange={handleAmountChange}
+          type="text"
+          mb="md"
+          required
+        />
+
+        <TextInput
+          label="Data"
+          type="date"
+          value={formData.date}
+          onChange={handleDateChange}
+          mb="md"
+          required
+        />
+
+        <Group justify="flex-end">
+          <Button variant="outline" onClick={() => setEditOpened(false)} color="#0ca167">
+            Cancelar
+          </Button>
+          <Button onClick={handleEditExpense} color="#0ca167">
+            Salvar Alterações
+          </Button>
+        </Group>
+      </Modal>
+
+      {/* Modal de confirmação de exclusão */}
+      <Modal
+        opened={deleteOpened}
+        onClose={() => setDeleteOpened(false)}
+        title="Confirmar Exclusão"
+        size="sm"
+        centered
+      >
+        <Text size="sm" mb="md">
+          Tem certeza que deseja excluir este gasto?
+        </Text>
+
+        {expenseToDelete && (
+          <Box mb="md" p="sm" style={{ backgroundColor: '#f8f9fa', borderRadius: '8px', border: '1px solid #e9ecef' }}>
+            <Text size="sm" fw={500} mb="xs">
+              {expenseToDelete.description}
+            </Text>
+            <Text size="xs" c="dimmed" mb="xs">
+              {expenseToDelete.category} • {new Date(expenseToDelete.date).toLocaleDateString('pt-BR')}
+            </Text>
+            <Text size="sm" c="red" fw={500}>
+              {formatCurrency(expenseToDelete.amount)}
+            </Text>
+          </Box>
+        )}
+
+        <Text size="xs" c="dimmed" mb="md">
+          Esta ação não pode ser desfeita.
+        </Text>
+
+        <Group justify="flex-end">
+          <Button variant="outline" onClick={() => setDeleteOpened(false)} color="#0ca167">
+            Cancelar
+          </Button>
+          <Button onClick={confirmDeleteExpense} color="red">
+            Excluir Gasto
           </Button>
         </Group>
       </Modal>

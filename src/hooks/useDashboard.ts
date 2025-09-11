@@ -1,10 +1,11 @@
 import { useContext } from 'react'
 import { DashboardContext } from '../contexts/DashboardContext'
 
-export const useDashboard = () => {
+export function useDashboard() {
   const context = useContext(DashboardContext)
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useDashboard must be used within a DashboardProvider')
   }
-  return context
+  const { monthlyData, updateBudget, addExpense, editExpense, deleteExpense, getCurrentMonth } = context
+  return { monthlyData, updateBudget, addExpense, editExpense, deleteExpense, getCurrentMonth }
 }

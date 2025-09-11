@@ -5,6 +5,7 @@ import { ThemeProvider } from './contexts/ThemeContext'
 import { SubscriptionsProvider } from './contexts/SubscriptionsContext'
 import { AlertsProvider } from './contexts/AlertsContext'
 import { ReportsProvider } from './contexts/ReportsContext'
+import { DashboardProvider } from './contexts/DashboardContext'
 import { useTheme } from './hooks/useTheme'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { RegisterScreen } from './components/auth/RegisterScreen'
@@ -91,13 +92,15 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <SubscriptionsProvider>
-        <AlertsProvider>
-          <ReportsProvider>
-            <AppContent />
-          </ReportsProvider>
-        </AlertsProvider>
-      </SubscriptionsProvider>
+      <DashboardProvider>
+        <SubscriptionsProvider>
+          <AlertsProvider>
+            <ReportsProvider>
+              <AppContent />
+            </ReportsProvider>
+          </AlertsProvider>
+        </SubscriptionsProvider>
+      </DashboardProvider>
     </ThemeProvider>
   )
 }

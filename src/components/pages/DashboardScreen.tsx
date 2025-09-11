@@ -2,10 +2,9 @@ import { Container, Title } from '@mantine/core'
 import { BudgetSummary } from '../dashboard/BudgetSummary'
 import { CategoryCharts } from '../dashboard/CategoryCharts'
 import { RecentExpenses } from '../dashboard/RecentExpenses'
-import { DashboardProvider } from '../../contexts/DashboardContext'
 import { useDashboard } from '../../hooks/useDashboard'
 
-function DashboardContent() {
+export function DashboardScreen() {
   const { getCurrentMonth } = useDashboard()
 
   return (
@@ -18,13 +17,5 @@ function DashboardContent() {
 
       <RecentExpenses />
     </Container>
-  )
-}
-
-export function DashboardScreen() {
-  return (
-    <DashboardProvider>
-      <DashboardContent />
-    </DashboardProvider>
   )
 }
