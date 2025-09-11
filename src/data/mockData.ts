@@ -1,4 +1,4 @@
-import type { MonthlyData } from '../types';
+import type { MonthlyData, Alert } from '../types';
 
 // Dados mock para categorias com cores padronizadas
 export const categories = [
@@ -36,7 +36,7 @@ export const subscriptions = [
 ];
 
 // Dados mock para alertas
-export const alerts = [
+export const alerts: Alert[] = [
   { id: 1, type: 'warning', title: 'Orçamento quase esgotado', message: 'Você já gastou 85% do seu orçamento mensal', date: '2025-01-09' },
   { id: 2, type: 'info', title: 'Assinatura vencendo', message: 'Netflix vence em 5 dias', date: '2025-01-08' },
   { id: 3, type: 'success', title: 'Meta atingida', message: 'Parabéns! Você economizou R$ 200 este mês', date: '2025-01-07' },
