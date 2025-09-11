@@ -1,15 +1,5 @@
-import { useContext, createContext } from 'react'
-import type { AuthState, LoginCredentials, RegisterData } from '../types'
-
-interface AuthContextType extends AuthState {
-  login: (credentials: LoginCredentials) => Promise<boolean>
-  register: (data: RegisterData) => Promise<boolean>
-  logout: () => void
-  error: string | null
-  clearError: () => void
-}
-
-export const AuthContext = createContext<AuthContextType | undefined>(undefined)
+import { useContext } from 'react'
+import { AuthContext } from '../contexts/AuthContextDefinition'
 
 export const useAuth = () => {
   const context = useContext(AuthContext)

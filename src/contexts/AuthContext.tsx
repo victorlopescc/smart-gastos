@@ -1,14 +1,6 @@
 import React, { useState, useEffect, type ReactNode } from 'react'
-import type {User, AuthState, LoginCredentials, RegisterData} from '../types'
-import { AuthContext } from '../hooks/useAuth'
-
-interface AuthContextType extends AuthState {
-  login: (credentials: LoginCredentials) => Promise<boolean>
-  register: (data: RegisterData) => Promise<boolean>
-  logout: () => void
-  error: string | null
-  clearError: () => void
-}
+import type {User, LoginCredentials, RegisterData} from '../types'
+import { AuthContext, type AuthContextType } from './AuthContextDefinition'
 
 // Simulação de banco de dados local usando localStorage
 const USERS_KEY = 'financeapp_users'
@@ -19,7 +11,13 @@ interface StoredUser {
   email: string
   name: string
   password: string
+  avatar?: string
   createdAt: string
+  preferences: {
+    currency: string
+    notifications: boolean
+    darkMode: boolean
+  }
 }
 
 const getStoredUsers = (): StoredUser[] => {
@@ -33,9 +31,23 @@ const saveUser = (user: StoredUser) => {
   localStorage.setItem(USERS_KEY, JSON.stringify(users))
 }
 
+const updateStoredUser = (updatedUser: StoredUser) => {
+  const users = getStoredUsers()
+  const userIndex = users.findIndex(user => user.id === updatedUser.id)
+  if (userIndex !== -1) {
+    users[userIndex] = updatedUser
+    localStorage.setItem(USERS_KEY, JSON.stringify(users))
+  }
+}
+
 const findUserByEmail = (email: string): StoredUser | null => {
   const users = getStoredUsers()
   return users.find(user => user.email === email) || null
+}
+
+const findUserById = (id: string): StoredUser | null => {
+  const users = getStoredUsers()
+  return users.find(user => user.id === id) || null
 }
 
 const generateId = (): string => {
@@ -51,7 +63,12 @@ const initializeTestAccount = () => {
       email: testEmail,
       name: 'Usuário Teste',
       password: '123456',
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
+      preferences: {
+        currency: 'BRL',
+        notifications: true,
+        darkMode: false
+      }
     }
     saveUser(testUser)
   }
@@ -103,7 +120,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         id: storedUser.id,
         email: storedUser.email,
         name: storedUser.name,
-        createdAt: storedUser.createdAt
+        createdAt: storedUser.createdAt,
+        avatar: storedUser.avatar
       }
 
       setUser(userSession)
@@ -148,7 +166,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         email: data.email,
         name: data.name,
         password: data.password,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        preferences: {
+          currency: 'BRL',
+          notifications: true,
+          darkMode: false
+        }
       }
 
       saveUser(newUser)
@@ -162,6 +185,108 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setUser(userSession)
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(userSession))
+      return true
+
+    } catch {
+      setError('Erro interno. Tente novamente.')
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const updateProfile = async (data: { name: string; email: string; avatar?: string }): Promise<boolean> => {
+    setError(null)
+    setIsLoading(true)
+
+    try {
+      if (!user) {
+        setError('Usuário não encontrado')
+        return false
+      }
+
+      // Verificar se o novo email já está em uso por outro usuário
+      if (data.email !== user.email) {
+        const existingUser = findUserByEmail(data.email)
+        if (existingUser && existingUser.id !== user.id) {
+          setError('Este email já está em uso')
+          return false
+        }
+      }
+
+      // Simular delay de rede
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      const storedUser = findUserById(user.id)
+      if (!storedUser) {
+        setError('Usuário não encontrado')
+        return false
+      }
+
+      const updatedUser: StoredUser = {
+        ...storedUser,
+        name: data.name,
+        email: data.email,
+        avatar: data.avatar || storedUser.avatar
+      }
+
+      updateStoredUser(updatedUser)
+
+      const updatedSession: User = {
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        createdAt: updatedUser.createdAt,
+        avatar: updatedUser.avatar
+      }
+
+      setUser(updatedSession)
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(updatedSession))
+      return true
+
+    } catch {
+      setError('Erro interno. Tente novamente.')
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const updatePassword = async (data: { currentPassword: string; newPassword: string }): Promise<boolean> => {
+    setError(null)
+    setIsLoading(true)
+
+    try {
+      if (!user) {
+        setError('Usuário não encontrado')
+        return false
+      }
+
+      const storedUser = findUserById(user.id)
+      if (!storedUser) {
+        setError('Usuário não encontrado')
+        return false
+      }
+
+      if (storedUser.password !== data.currentPassword) {
+        setError('Senha atual incorreta')
+        return false
+      }
+
+      if (data.newPassword.length < 6) {
+        setError('A nova senha deve ter pelo menos 6 caracteres')
+        return false
+      }
+
+      // Simular delay de rede
+      await new Promise(resolve => setTimeout(resolve, 1000))
+
+      const updatedUser: StoredUser = {
+        ...storedUser,
+        password: data.newPassword
+      }
+
+      updateStoredUser(updatedUser)
       return true
 
     } catch {
@@ -190,7 +315,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     register,
     logout,
     error,
-    clearError
+    clearError,
+    updateProfile,
+    updatePassword
   }
 
   return (
