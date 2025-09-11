@@ -68,16 +68,40 @@ export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLa
       } as React.CSSProperties}
     >
       <AppShell.Header>
-        <Group h="100%" px="md">
-          <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
-          <Box>
-            <Image
-              src={logoColor}
-              alt="Smart Gastos"
-              h={50}
-              fit="contain"
-            />
-          </Box>
+        <Group h="100%" px="md" justify="space-between">
+          <Group>
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
+            <Box>
+              <Image
+                src={logoColor}
+                alt="Smart Gastos"
+                h={50}
+                fit="contain"
+              />
+            </Box>
+          </Group>
+
+          <Button
+            variant="subtle"
+            color="red"
+            size="sm"
+            onClick={handleLogout}
+            leftSection={<IconLogout size="1rem" />}
+            visibleFrom="sm"
+          >
+            Sair
+          </Button>
+
+          <Button
+            variant="subtle"
+            color="red"
+            size="sm"
+            onClick={handleLogout}
+            hiddenFrom="sm"
+            p="xs"
+          >
+            <IconLogout size="1rem" />
+          </Button>
         </Group>
       </AppShell.Header>
 
@@ -106,16 +130,6 @@ export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLa
               />
             ))}
           </Stack>
-
-          <Button
-            leftSection={<IconLogout size="1rem" />}
-            variant="light"
-            color="red"
-            onClick={handleLogout}
-            mt="auto"
-          >
-            Sair
-          </Button>
         </Stack>
       </AppShell.Navbar>
 
