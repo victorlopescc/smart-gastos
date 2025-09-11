@@ -4,6 +4,7 @@ import { categories as initialCategories, recentExpenses as initialExpenses } fr
 
 interface DashboardContextType {
   monthlyData: MonthlyData
+  addedExpenses: Expense[]
   updateBudget: (newBudget: number) => void
   addExpense: (expense: Omit<Expense, 'id'>) => void
   editExpense: (id: number, expense: Omit<Expense, 'id'>) => void
@@ -152,6 +153,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     <DashboardContext.Provider
       value={{
         monthlyData,
+        addedExpenses,
         updateBudget,
         addExpense,
         editExpense,

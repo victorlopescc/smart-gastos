@@ -17,6 +17,7 @@ import {
   IconUser,
   IconLogout,
   IconPlus,
+  IconHistory,
 } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useTheme } from '../../hooks/useTheme'
@@ -42,6 +43,7 @@ export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLa
     { value: 'subscriptions', label: 'Assinaturas', icon: IconCreditCard },
     { value: 'alerts', label: 'Alertas', icon: IconBell },
     { value: 'reports', label: 'Relatórios', icon: IconChartBar },
+    { value: 'expense-history', label: 'Histórico', icon: IconHistory },
     { value: 'profile', label: 'Perfil', icon: IconUser }
   ]
 

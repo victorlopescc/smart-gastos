@@ -14,9 +14,10 @@ import { DashboardScreen } from './components/pages/DashboardScreen'
 import { SubscriptionsScreen } from './components/pages/SubscriptionsScreen'
 import { AlertsScreen } from './components/pages/AlertsScreen'
 import { ReportsScreen } from './components/pages/ReportsScreen'
+import { ExpenseHistoryScreen } from './components/pages/ExpenseHistoryScreen'
 import { ProfileScreen } from './components/pages/ProfileScreen'
 
-type Screen = 'login' | 'register' | 'dashboard' | 'subscriptions' | 'alerts' | 'reports' | 'profile'
+type Screen = 'login' | 'register' | 'dashboard' | 'subscriptions' | 'alerts' | 'reports' | 'expense-history' | 'profile'
 
 function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login')
@@ -56,6 +57,8 @@ function AppContent() {
         return <AlertsScreen />
       case 'reports':
         return <ReportsScreen />
+      case 'expense-history':
+        return <ExpenseHistoryScreen />
       case 'profile':
         return <ProfileScreen />
       default:
