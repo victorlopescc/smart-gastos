@@ -18,7 +18,9 @@ import {
   IconLogout,
 } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
+import { useTheme } from '../../hooks/useTheme'
 import logoColor from '../../assets/images/logo_color.png'
+import logoWhite from '../../assets/images/logo_white.png'
 import React from "react";
 
 interface AppLayoutProps {
@@ -30,6 +32,7 @@ interface AppLayoutProps {
 
 export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLayoutProps) {
   const [opened, { toggle, close }] = useDisclosure()
+  const { isDark } = useTheme()
 
   const menuItems = [
     { value: 'dashboard', label: 'Dashboard', icon: IconDashboard },
@@ -73,7 +76,7 @@ export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLa
             <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" />
             <Box>
               <Image
-                src={logoColor}
+                src={isDark ? logoWhite : logoColor}
                 alt="Smart Gastos"
                 h={50}
                 fit="contain"
@@ -109,7 +112,7 @@ export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLa
         <Stack>
           <Box mb="sm">
             <Image
-              src={logoColor}
+              src={isDark ? logoWhite : logoColor}
               alt="Smart Gastos"
               h={80}
               fit="contain"

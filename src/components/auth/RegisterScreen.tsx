@@ -14,7 +14,9 @@ import {
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
+import { useTheme } from '../../hooks/useTheme'
 import logoColor from '../../assets/images/logo_color.png'
+import logoWhite from '../../assets/images/logo_white.png'
 
 interface RegisterScreenProps {
   onRegister: () => void;
@@ -23,6 +25,7 @@ interface RegisterScreenProps {
 
 export function RegisterScreen({ onRegister, onBackToLogin }: RegisterScreenProps) {
   const [loading, setLoading] = useState(false)
+  const { isDark } = useTheme()
 
   const form = useForm({
     initialValues: {
@@ -62,7 +65,7 @@ export function RegisterScreen({ onRegister, onBackToLogin }: RegisterScreenProp
         <Paper radius="md" p="xl" withBorder>
           <Box ta="center">
             <Image
-              src={logoColor}
+              src={isDark ? logoWhite : logoColor}
               alt="Smart Gastos"
               h={140}
               fit="contain"

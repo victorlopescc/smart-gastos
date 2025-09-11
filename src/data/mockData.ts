@@ -67,7 +67,7 @@ export const userData = {
   memberSince: '2024-03-15',
   preferences: {
     currency: 'BRL',
-    notifications: true,
+    notifications: false,
     darkMode: false
   }
 };

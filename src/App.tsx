@@ -1,4 +1,8 @@
 import { useState } from 'react'
+import { MantineProvider } from '@mantine/core'
+import { Notifications } from '@mantine/notifications'
+import { ThemeProvider } from './contexts/ThemeContext'
+import { useTheme } from './hooks/useTheme'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { RegisterScreen } from './components/auth/RegisterScreen'
 import { AppLayout } from './components/layout/AppLayout'
@@ -10,8 +14,9 @@ import { ProfileScreen } from './components/pages/ProfileScreen'
 
 type Screen = 'login' | 'register' | 'dashboard' | 'subscriptions' | 'alerts' | 'reports' | 'profile'
 
-function App() {
+function AppContent() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('login')
+  const { isDark } = useTheme()
 
   const handleLogin = () => {
     setCurrentScreen('dashboard')
@@ -54,24 +59,37 @@ function App() {
     }
   }
 
-  // Telas de autenticação (sem layout)
-  if (currentScreen === 'login') {
-    return <LoginScreen onLogin={handleLogin} onGoToRegister={handleGoToRegister} />
-  }
-
-  if (currentScreen === 'register') {
-    return <RegisterScreen onRegister={handleRegister} onBackToLogin={handleBackToLogin} />
-  }
-
-  // Telas principais (com layout e menu lateral)
   return (
-    <AppLayout
-      currentPage={currentScreen}
-      onNavigate={handleNavigate}
-      onLogout={handleLogout}
-    >
-      {renderPageContent()}
-    </AppLayout>
+    <MantineProvider defaultColorScheme="auto" forceColorScheme={isDark ? 'dark' : 'light'}>
+      <Notifications />
+      {/* Telas de autenticação (sem layout) */}
+      {currentScreen === 'login' && (
+        <LoginScreen onLogin={handleLogin} onGoToRegister={handleGoToRegister} />
+      )}
+
+      {currentScreen === 'register' && (
+        <RegisterScreen onRegister={handleRegister} onBackToLogin={handleBackToLogin} />
+      )}
+
+      {/* Telas principais (com layout e menu lateral) */}
+      {currentScreen !== 'login' && currentScreen !== 'register' && (
+        <AppLayout
+          currentPage={currentScreen}
+          onNavigate={handleNavigate}
+          onLogout={handleLogout}
+        >
+          {renderPageContent()}
+        </AppLayout>
+      )}
+    </MantineProvider>
+  )
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   )
 }
 

@@ -18,12 +18,16 @@ import {IconUser, IconSettings, IconBell, IconLock, IconDeviceFloppy} from '@tab
 import {useState} from 'react'
 import {notifications} from '@mantine/notifications'
 import {userData} from '../../data/mockData'
+import { useTheme } from '../../hooks/useTheme'
 
 export function ProfileScreen() {
     const [loading, setLoading] = useState(false)
     const [notifications_enabled, setNotificationsEnabled] = useState(userData.preferences.notifications)
     const [email_alerts, setEmailAlerts] = useState(false)
-    const [darkMode, setDarkMode] = useState(userData.preferences.darkMode)
+    const [currency, setCurrency] = useState(userData.preferences.currency)
+    const [name, setName] = useState(userData.name)
+    const [email, setEmail] = useState(userData.email)
+    const { isDark, toggleTheme } = useTheme()
 
     const handleSave = () => {
         setLoading(true)
@@ -74,11 +78,13 @@ export function ProfileScreen() {
                             <Stack>
                                 <TextInput
                                     label="Nome completo"
-                                    defaultValue={userData.name}
+                                    value={name}
+                                    onChange={(event) => setName(event.currentTarget.value)}
                                 />
                                 <TextInput
                                     label="Email"
-                                    defaultValue={userData.email}
+                                    value={email}
+                                    onChange={(event) => setEmail(event.currentTarget.value)}
                                 />
                                 <Select
                                     label="Moeda padrão"
@@ -87,7 +93,8 @@ export function ProfileScreen() {
                                         {value: 'USD', label: 'Dólar ($)'},
                                         {value: 'EUR', label: 'Euro (€)'}
                                     ]}
-                                    defaultValue={userData.preferences.currency}
+                                    value={currency}
+                                    onChange={(value) => setCurrency(value || 'BRL')}
                                 />
                             </Stack>
                         </Card>
@@ -110,8 +117,8 @@ export function ProfileScreen() {
                                 />
                                 <Switch
                                     label="Modo escuro"
-                                    checked={darkMode}
-                                    onChange={(event) => setDarkMode(event.currentTarget.checked)}
+                                    checked={isDark}
+                                    onChange={toggleTheme}
                                 />
                             </Stack>
                         </Card>
