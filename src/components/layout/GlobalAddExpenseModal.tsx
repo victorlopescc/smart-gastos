@@ -1,6 +1,7 @@
 import { Modal, TextInput, Select, Group, Button } from '@mantine/core'
 import { useState } from 'react'
 import { useDashboard } from '../../hooks/useDashboard'
+import { createAmountChangeHandler, parseCurrencyToNumber } from '../../utils/formatters'
 
 interface GlobalAddExpenseModalProps {
   opened: boolean
@@ -29,9 +30,7 @@ export function GlobalAddExpenseModal({ opened, onClose }: GlobalAddExpenseModal
   ]
 
   const handleAddExpense = () => {
-    // Remove formatação e converte para número
-    const amountValue = formData.amount.replace(/\D/g, '')
-    const amount = amountValue ? parseInt(amountValue) / 100 : 0
+    const amount = parseCurrencyToNumber(formData.amount)
 
     if (formData.description && formData.category && amount > 0) {
       addExpense({
@@ -52,26 +51,7 @@ export function GlobalAddExpenseModal({ opened, onClose }: GlobalAddExpenseModal
     }
   }
 
-  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    let value = event.target?.value || ''
-    // Remove tudo que não é número
-    value = value.replace(/\D/g, '')
-    
-    if (value) {
-      // Converte para número e divide por 100 para ter os centavos
-      const numericValue = parseInt(value) / 100
-      
-      // Formata como moeda brasileira em tempo real
-      const formattedValue = numericValue.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
-
-      setFormData(prev => ({ ...prev, amount: formattedValue }))
-    } else {
-      setFormData(prev => ({ ...prev, amount: '' }))
-    }
-  }
+  const handleAmountChange = createAmountChangeHandler(setFormData)
 
   const handleClose = () => {
     // Reset form when closing

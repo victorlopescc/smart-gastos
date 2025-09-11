@@ -1,4 +1,4 @@
-import type { MonthlyData, Alert } from '../types';
+import type { MonthlyData, Alert, Subscription } from '../types';
 
 // Dados mock para categorias com cores padronizadas
 export const categories = [
@@ -27,7 +27,7 @@ export const recentExpenses = [
 ];
 
 // Dados mock para assinaturas
-export const subscriptions = [
+export const subscriptions: Subscription[] = [
   { id: 1, name: 'Netflix', category: 'Entretenimento', amount: 32.90, nextPayment: '2025-02-15', status: 'Ativa' },
   { id: 2, name: 'Spotify', category: 'Entretenimento', amount: 21.90, nextPayment: '2025-02-08', status: 'Ativa' },
   { id: 3, name: 'Amazon Prime', category: 'Entretenimento', amount: 14.90, nextPayment: '2025-02-20', status: 'Ativa' },

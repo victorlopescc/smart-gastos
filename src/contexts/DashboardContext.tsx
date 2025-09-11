@@ -1,4 +1,4 @@
-import { createContext, useState, type ReactNode } from 'react'
+import { createContext, useState, useCallback, useMemo, type ReactNode } from 'react'
 import type { MonthlyData, Expense, Category } from '../types'
 import { categories as initialCategories, recentExpenses as initialExpenses } from '../data/mockData'
 
@@ -45,27 +45,70 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }))
   }
 
-  const currentMonthExpenses = getCurrentMonthExpenses() || []
-  const totalSpent = currentMonthExpenses.reduce((sum, expense) => sum + (expense?.amount || 0), 0)
+  const currentMonthExpenses = useMemo(() => getCurrentMonthExpenses() || [], [])
 
   // Estado separado para os gastos adicionados pelo usuário
   const [addedExpenses, setAddedExpenses] = useState<Expense[]>([])
 
-  const [monthlyData, setMonthlyData] = useState<MonthlyData>({
-    budget: 5000,
-    spent: totalSpent,
-    categories: calculateCategoriesFromExpenses(currentMonthExpenses),
-    recentExpenses: currentMonthExpenses.slice(0, 5).sort((a, b) =>
-      new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
-    )
+  // Inicialização do monthlyData considerando gastos adicionados
+  const [monthlyData, setMonthlyData] = useState<MonthlyData>(() => {
+    // Filtra gastos do mês atual dos gastos adicionados
+    const currentMonth = new Date().getMonth()
+    const currentYear = new Date().getFullYear()
+
+    const currentMonthAddedExpenses = addedExpenses.filter(expense => {
+      const date = new Date(expense.date)
+      return date.getMonth() === currentMonth && date.getFullYear() === currentYear
+    })
+
+    // Combina gastos existentes com adicionados
+    const allCurrentMonthExpenses = [...currentMonthAddedExpenses, ...currentMonthExpenses]
+    const totalSpentWithAdded = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+
+    return {
+      budget: 5000,
+      spent: totalSpentWithAdded,
+      categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
+      recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
+        new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
+      )
+    }
   })
+
+  // Função utilitária para recalcular dados mensais
+  const recalculateMonthlyData = useCallback((updatedAddedExpenses: Expense[], budget?: number) => {
+    const currentMonth = new Date().getMonth()
+    const currentYear = new Date().getFullYear()
+
+    // Filtra gastos do mês atual dos gastos adicionados
+    const currentMonthAddedExpenses = updatedAddedExpenses.filter(expense => {
+      const date = new Date(expense.date)
+      return date.getMonth() === currentMonth && date.getFullYear() === currentYear
+    })
+
+    // Combina com gastos iniciais do mês atual
+    const allCurrentMonthExpenses = [...currentMonthAddedExpenses, ...currentMonthExpenses]
+
+    // Calcula o novo valor gasto
+    const newSpent = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+
+    setMonthlyData(prev => ({
+      ...prev,
+      budget: budget ?? prev.budget,
+      spent: newSpent,
+      categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
+      recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
+        new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
+      )
+    }))
+  }, [currentMonthExpenses])
 
   const updateBudget = (newBudget: number) => {
     if (newBudget > 0) {
-      setMonthlyData(prev => prev ? {
+      setMonthlyData(prev => ({
         ...prev,
         budget: newBudget
-      } : prev)
+      }))
     }
   }
 
@@ -79,41 +122,10 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       id: Date.now()
     }
 
-    // Adiciona ao estado dos gastos adicionados
-    setAddedExpenses(prev => [newExpense, ...prev])
-
-    // Verifica se o gasto é do mês atual
-    const expenseDate = new Date(newExpense.date)
-    const currentMonth = new Date().getMonth()
-    const currentYear = new Date().getFullYear()
-    const isCurrentMonth = expenseDate.getMonth() === currentMonth &&
-                           expenseDate.getFullYear() === currentYear
-
-    setMonthlyData(prev => {
-      if (!prev) return prev
-
-      // Filtra apenas gastos do mês atual para cálculos
-      const currentMonthAddedExpenses = addedExpenses.filter(expense => {
-        const date = new Date(expense.date)
-        return date.getMonth() === currentMonth && date.getFullYear() === currentYear
-      })
-
-      // Combina gastos existentes com os novos gastos adicionados do mês atual
-      const allCurrentMonthExpenses = isCurrentMonth
-        ? [newExpense, ...currentMonthAddedExpenses, ...currentMonthExpenses]
-        : [...currentMonthAddedExpenses, ...currentMonthExpenses]
-
-      // Calcula o novo valor gasto apenas com gastos do mês atual
-      const newSpent = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-
-      return {
-        ...prev,
-        spent: newSpent,
-        categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
-        recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
-          new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
-        )
-      }
+    setAddedExpenses(prev => {
+      const updatedExpenses = [newExpense, ...prev]
+      recalculateMonthlyData(updatedExpenses)
+      return updatedExpenses
     })
   }
 
@@ -123,36 +135,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         ? { ...expense, ...expenseData }
         : expense
       )
-
-      // Atualiza o monthlyData com os gastos atualizados
-      setMonthlyData(prevData => {
-        if (!prevData) return prevData
-
-        const currentMonth = new Date().getMonth()
-        const currentYear = new Date().getFullYear()
-
-        // Filtra gastos do mês atual dos gastos atualizados
-        const currentMonthUpdatedExpenses = updatedExpenses.filter(expense => {
-          const date = new Date(expense.date)
-          return date.getMonth() === currentMonth && date.getFullYear() === currentYear
-        })
-
-        // Combina com gastos iniciais do mês atual
-        const allCurrentMonthExpenses = [...currentMonthUpdatedExpenses, ...currentMonthExpenses]
-
-        // Calcula o novo valor gasto
-        const newSpent = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-
-        return {
-          ...prevData,
-          spent: newSpent,
-          categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
-          recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
-            new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
-          )
-        }
-      })
-
+      recalculateMonthlyData(updatedExpenses)
       return updatedExpenses
     })
   }
@@ -160,36 +143,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const deleteExpense = (id: number) => {
     setAddedExpenses(prev => {
       const updatedExpenses = prev.filter(expense => expense.id !== id)
-
-      // Atualiza o monthlyData com os gastos atualizados
-      setMonthlyData(prevData => {
-        if (!prevData) return prevData
-
-        const currentMonth = new Date().getMonth()
-        const currentYear = new Date().getFullYear()
-
-        // Filtra gastos do mês atual dos gastos atualizados
-        const currentMonthUpdatedExpenses = updatedExpenses.filter(expense => {
-          const date = new Date(expense.date)
-          return date.getMonth() === currentMonth && date.getFullYear() === currentYear
-        })
-
-        // Combina com gastos iniciais do mês atual
-        const allCurrentMonthExpenses = [...currentMonthUpdatedExpenses, ...currentMonthExpenses]
-
-        // Calcula o novo valor gasto
-        const newSpent = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-
-        return {
-          ...prevData,
-          spent: newSpent,
-          categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
-          recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
-            new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
-          )
-        }
-      })
-
+      recalculateMonthlyData(updatedExpenses)
       return updatedExpenses
     })
   }

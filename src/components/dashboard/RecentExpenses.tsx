@@ -3,6 +3,7 @@ import { IconPlus, IconEdit, IconTrash } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useDashboard } from '../../hooks/useDashboard'
 import { categories as categoryColors } from '../../data/mockData'
+import { createAmountChangeHandler, parseCurrencyToNumber } from '../../utils/formatters'
 import type { Expense } from '../../types'
 
 export function RecentExpenses() {
@@ -43,9 +44,7 @@ export function RecentExpenses() {
   }
 
   const handleAddExpense = () => {
-    // Remove formatação e converte para número
-    const amountValue = formData.amount.replace(/\D/g, '')
-    const amount = amountValue ? parseInt(amountValue) / 100 : 0
+    const amount = parseCurrencyToNumber(formData.amount)
 
     if (formData.description && formData.category && amount > 0) {
       addExpense({
@@ -55,6 +54,7 @@ export function RecentExpenses() {
         date: formData.date
       })
 
+      // Reset form
       setFormData({
         description: '',
         category: '',
@@ -65,48 +65,27 @@ export function RecentExpenses() {
     }
   }
 
-  const handleEditExpense = () => {
-    if (!editingExpense) return
+  const handleSaveEdit = () => {
+    if (editingExpense) {
+      const amount = parseCurrencyToNumber(formData.amount)
 
-    console.log('Editando gasto:', editingExpense)
-    console.log('Dados do formulário:', formData)
+      if (formData.description && formData.category && amount > 0) {
+        editExpense(editingExpense.id, {
+          description: formData.description,
+          category: formData.category,
+          amount: amount,
+          date: formData.date
+        })
 
-    // Remove formatação e converte para número
-    const amountValue = formData.amount.replace(/\D/g, '')
-    const amount = amountValue ? parseInt(amountValue) / 100 : 0
-
-    console.log('Valor convertido:', amount)
-
-    if (formData.description && formData.category && amount > 0) {
-      console.log('Chamando editExpense com:', {
-        id: editingExpense.id,
-        description: formData.description,
-        category: formData.category,
-        amount: amount,
-        date: formData.date
-      })
-
-      editExpense(editingExpense.id, {
-        description: formData.description,
-        category: formData.category,
-        amount: amount,
-        date: formData.date
-      })
-
-      setFormData({
-        description: '',
-        category: '',
-        amount: '',
-        date: new Date().toISOString().split('T')[0]
-      })
-      setEditOpened(false)
-      setEditingExpense(null)
-    } else {
-      console.log('Validação falhou:', {
-        description: formData.description,
-        category: formData.category,
-        amount: amount
-      })
+        setEditOpened(false)
+        setEditingExpense(null)
+        setFormData({
+          description: '',
+          category: '',
+          amount: '',
+          date: new Date().toISOString().split('T')[0]
+        })
+      }
     }
   }
 
@@ -152,26 +131,7 @@ export function RecentExpenses() {
     setFormData(prev => ({ ...prev, description: value }))
   }
 
-  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    let value = event.target?.value || ''
-    // Remove tudo que não é número
-    value = value.replace(/\D/g, '')
-    
-    if (value) {
-      // Converte para número e divide por 100 para ter os centavos
-      const numericValue = parseInt(value) / 100
-      
-      // Formata como moeda brasileira em tempo real
-      const formattedValue = numericValue.toLocaleString('pt-BR', {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      })
-      
-      setFormData(prev => ({ ...prev, amount: formattedValue }))
-    } else {
-      setFormData(prev => ({ ...prev, amount: '' }))
-    }
-  }
+  const handleAmountChange = createAmountChangeHandler(setFormData)
 
   const handleDateChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target?.value || ''
@@ -364,7 +324,7 @@ export function RecentExpenses() {
           <Button variant="outline" onClick={() => setEditOpened(false)} color="#0ca167">
             Cancelar
           </Button>
-          <Button onClick={handleEditExpense} color="#0ca167">
+          <Button onClick={handleSaveEdit} color="#0ca167">
             Salvar Alterações
           </Button>
         </Group>
