@@ -5,27 +5,30 @@ import {
   TextInput,
   PasswordInput,
   Button,
+  Text,
   Group,
   Stack,
-  Text,
   Divider,
   Box,
-  Image
+  Image,
+  Alert
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
+import { IconAlertCircle } from '@tabler/icons-react'
 import { useTheme } from '../../hooks/useTheme'
+import { useAuth } from '../../hooks/useAuth'
 import logoColor from '../../assets/images/logo_color.png'
 import logoWhite from '../../assets/images/logo_white.png'
 
 interface RegisterScreenProps {
-  onRegister: () => void;
-  onBackToLogin: () => void;
+  onSwitchToLogin: () => void
 }
 
-export function RegisterScreen({ onRegister, onBackToLogin }: RegisterScreenProps) {
-  const [loading, setLoading] = useState(false)
+export function RegisterScreen({ onSwitchToLogin }: RegisterScreenProps) {
+  const { register, error, isLoading, clearError } = useAuth()
   const { isDark } = useTheme()
+  const [loading, setLoading] = useState(false)
 
   const form = useForm({
     initialValues: {
@@ -44,38 +47,42 @@ export function RegisterScreen({ onRegister, onBackToLogin }: RegisterScreenProp
     },
   })
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (values: typeof form.values) => {
     setLoading(true)
+    clearError()
+    const success = await register(values)
 
-    // Simula um cadastro
-    setTimeout(() => {
-      setLoading(false)
+    if (success) {
       notifications.show({
         title: 'Cadastro realizado!',
         message: 'Bem-vindo ao Smart Gastos!',
         color: 'green',
       })
-      onRegister()
-    }, 1000)
+    }
+
+    setLoading(false)
   }
 
   return (
     <Container size="xs" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
       <Box w="100%">
         <Paper radius="md" p="xl" withBorder>
-          <Box ta="center">
+          <Box ta="center" mb="xl">
             <Image
               src={isDark ? logoWhite : logoColor}
               alt="Smart Gastos"
-              h={140}
+              h={120}
               fit="contain"
               mx="auto"
+              mb="md"
             />
+            <Text size="lg" fw={500} mb="xs">
+              Criar conta
+            </Text>
+            <Text size="sm" c="dimmed">
+              Junte-se a nós e comece a organizar suas finanças
+            </Text>
           </Box>
-
-          <Text size="sm" c="dimmed" ta="center" mb="xl">
-            Organize suas finanças de forma inteligente
-          </Text>
 
           <form onSubmit={form.onSubmit(handleSubmit)}>
             <Stack>
@@ -96,7 +103,7 @@ export function RegisterScreen({ onRegister, onBackToLogin }: RegisterScreenProp
               <PasswordInput
                 required
                 label="Senha"
-                placeholder="Sua senha"
+                placeholder="Mínimo 6 caracteres"
                 {...form.getInputProps('password')}
               />
 
@@ -107,11 +114,21 @@ export function RegisterScreen({ onRegister, onBackToLogin }: RegisterScreenProp
                 {...form.getInputProps('confirmPassword')}
               />
 
+              {error && (
+                <Alert
+                  icon={<IconAlertCircle size="1rem" />}
+                  color="red"
+                  variant="light"
+                >
+                  {error}
+                </Alert>
+              )}
+
               <Button
                 type="submit"
                 fullWidth
                 mt="xl"
-                loading={loading}
+                loading={isLoading || loading}
                 color="#0ca167"
               >
                 Criar conta
@@ -125,11 +142,22 @@ export function RegisterScreen({ onRegister, onBackToLogin }: RegisterScreenProp
             <Button
               variant="default"
               color="gray"
-              onClick={onBackToLogin}
+              onClick={onSwitchToLogin}
             >
-              Já tem uma conta? Fazer login
+              Já tem conta? Fazer login
             </Button>
           </Group>
+
+          <Text size="xs" c="dimmed" ta="center" mt="md">
+            Ao criar uma conta, você concorda com nossos{' '}
+            <Text component="span" c="blue" style={{ cursor: 'pointer' }}>
+              Termos de Uso
+            </Text>{' '}
+            e{' '}
+            <Text component="span" c="blue" style={{ cursor: 'pointer' }}>
+              Política de Privacidade
+            </Text>
+          </Text>
         </Paper>
       </Box>
     </Container>

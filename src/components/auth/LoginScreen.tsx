@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import {
   Container,
   Paper,
@@ -11,21 +10,23 @@ import {
   Anchor,
   Divider,
   Box,
-  Image
+  Image,
+  Alert
 } from '@mantine/core'
 import { useForm } from '@mantine/form'
 import { notifications } from '@mantine/notifications'
+import { IconAlertCircle } from '@tabler/icons-react'
 import { useTheme } from '../../hooks/useTheme'
+import { useAuth } from '../../hooks/useAuth'
 import logoColor from '../../assets/images/logo_color.png'
 import logoWhite from '../../assets/images/logo_white.png'
 
 interface LoginScreenProps {
-  onLogin: () => void;
-  onGoToRegister: () => void;
+  onSwitchToRegister: () => void
 }
 
-export function LoginScreen({ onLogin, onGoToRegister }: LoginScreenProps) {
-  const [loading, setLoading] = useState(false)
+export function LoginScreen({ onSwitchToRegister }: LoginScreenProps) {
+  const { login, error, isLoading, clearError } = useAuth()
   const { isDark } = useTheme()
 
   const form = useForm({
@@ -36,42 +37,43 @@ export function LoginScreen({ onLogin, onGoToRegister }: LoginScreenProps) {
 
     validate: {
       email: (value) => (/^\S+@\S+$/.test(value) ? null : 'Email inválido'),
-      password: (value) => (value.length < 6 ? 'Senha deve ter pelo menos 6 caracteres' : null),
+      password: (value) => (value.length < 1 ? 'Senha é obrigatória' : null),
     },
   })
 
   const handleSubmit = async (values: typeof form.values) => {
-    setLoading(true)
+    clearError()
+    const success = await login(values)
 
-    // Simular uma chamada de API
-    setTimeout(() => {
-      setLoading(false)
+    if (success) {
       notifications.show({
         title: 'Login realizado!',
-        message: `Bem-vindo ao Smart Gastos, ${values.email}!`,
+        message: `Bem-vindo de volta!`,
         color: 'green',
       })
-      onLogin()
-    }, 1500)
+    }
   }
 
   return (
     <Container size="xs" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
       <Box w="100%">
         <Paper radius="md" p="xl" withBorder>
-          <Box ta="center">
+          <Box ta="center" mb="xl">
             <Image
               src={isDark ? logoWhite : logoColor}
               alt="Smart Gastos"
-              h={140}
+              h={120}
               fit="contain"
               mx="auto"
+              mb="md"
             />
+            <Text size="lg" fw={500} mb="xs">
+              Bem-vindo de volta
+            </Text>
+            <Text size="sm" c="dimmed">
+              Entre na sua conta para continuar
+            </Text>
           </Box>
-
-          <Text size="sm" c="dimmed" ta="center" mb="xl">
-            Organize suas finanças de forma inteligente
-          </Text>
 
           <form onSubmit={form.onSubmit(handleSubmit)}>
             <Stack>
@@ -89,6 +91,16 @@ export function LoginScreen({ onLogin, onGoToRegister }: LoginScreenProps) {
                 {...form.getInputProps('password')}
               />
 
+              {error && (
+                <Alert
+                  icon={<IconAlertCircle size="1rem" />}
+                  color="red"
+                  variant="light"
+                >
+                  {error}
+                </Alert>
+              )}
+
               <Group justify="space-between" mt="xs">
                 <Anchor component="button" size="sm" type="button">
                   Esqueceu a senha?
@@ -99,7 +111,7 @@ export function LoginScreen({ onLogin, onGoToRegister }: LoginScreenProps) {
                 type="submit" 
                 fullWidth 
                 mt="xl" 
-                loading={loading}
+                loading={isLoading}
                 color="#0ca167"
               >
                 Entrar
@@ -113,11 +125,23 @@ export function LoginScreen({ onLogin, onGoToRegister }: LoginScreenProps) {
             <Button 
               variant="default" 
               color="gray" 
-              onClick={onGoToRegister}
+              onClick={onSwitchToRegister}
             >
               Criar conta
             </Button>
           </Group>
+
+          <Paper p="md" bg="gray.0" radius="md" mt="xl">
+            <Text size="sm" c="dimmed" ta="center" mb="xs">
+              Para testar, você pode usar:
+            </Text>
+            <Text size="xs" ta="center">
+              <strong>Email:</strong> teste@exemplo.com
+            </Text>
+            <Text size="xs" ta="center">
+              <strong>Senha:</strong> 123456
+            </Text>
+          </Paper>
         </Paper>
       </Box>
     </Container>

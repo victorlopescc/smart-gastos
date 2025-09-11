@@ -1,8 +1,11 @@
 import { useState } from 'react'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
-import { IntegratedProvider } from './contexts/IntegratedProvider'
+import { AuthProvider } from './contexts/AuthContext'
+import { ThemeProvider } from './contexts/ThemeContext'
+import { useAuth } from './hooks/useAuth'
 import { useTheme } from './hooks/useTheme'
+import { IntegratedProvider } from './contexts/IntegratedProvider'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { RegisterScreen } from './components/auth/RegisterScreen'
 import { AppLayout } from './components/layout/AppLayout'
@@ -12,39 +15,48 @@ import { AlertsScreen } from './components/pages/AlertsScreen'
 import { ReportsScreen } from './components/pages/ReportsScreen'
 import { ExpenseHistoryScreen } from './components/pages/ExpenseHistoryScreen'
 import { ProfileScreen } from './components/pages/ProfileScreen'
+import { Loader, Center } from '@mantine/core'
 
-type Screen = 'login' | 'register' | 'dashboard' | 'subscriptions' | 'alerts' | 'reports' | 'expense-history' | 'profile'
+type AuthView = 'login' | 'register'
+type Screen = 'dashboard' | 'subscriptions' | 'alerts' | 'reports' | 'expense-history' | 'profile'
 
-function AppContent() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>('login')
-  const { isDark } = useTheme()
+function AuthWrapper() {
+  const [currentView, setCurrentView] = useState<AuthView>('login')
+  const { isAuthenticated, isLoading } = useAuth()
 
-  const handleLogin = () => {
-    setCurrentScreen('dashboard')
+  if (isLoading) {
+    return (
+      <Center style={{ height: '100vh' }}>
+        <Loader size="lg" color="#0ca167" />
+      </Center>
+    )
   }
 
-  const handleRegister = () => {
-    setCurrentScreen('login')
+  if (isAuthenticated) {
+    return <AuthenticatedApp />
   }
 
-  const handleLogout = () => {
-    setCurrentScreen('login')
-  }
+  return (
+    <>
+      {currentView === 'login' && (
+        <LoginScreen
+          onSwitchToRegister={() => setCurrentView('register')}
+        />
+      )}
+      {currentView === 'register' && (
+        <RegisterScreen
+          onSwitchToLogin={() => setCurrentView('login')}
+        />
+      )}
+    </>
+  )
+}
 
-  const handleGoToRegister = () => {
-    setCurrentScreen('register')
-  }
+function AuthenticatedApp() {
+  const [currentPage, setCurrentPage] = useState<Screen>('dashboard')
 
-  const handleBackToLogin = () => {
-    setCurrentScreen('login')
-  }
-
-  const handleNavigate = (page: string) => {
-    setCurrentScreen(page as Screen)
-  }
-
-  const renderPageContent = () => {
-    switch (currentScreen) {
+  const renderPage = () => {
+    switch (currentPage) {
       case 'dashboard':
         return <DashboardScreen />
       case 'subscriptions':
@@ -63,36 +75,35 @@ function AppContent() {
   }
 
   return (
+    <IntegratedProvider>
+      <AppLayout
+        currentPage={currentPage}
+        onNavigate={(page: string) => setCurrentPage(page as Screen)}
+      >
+        {renderPage()}
+      </AppLayout>
+    </IntegratedProvider>
+  )
+}
+
+function AppContent() {
+  const { isDark } = useTheme()
+
+  return (
     <MantineProvider defaultColorScheme="auto" forceColorScheme={isDark ? 'dark' : 'light'}>
-      <Notifications />
-      {/* Telas de autenticação (sem layout) */}
-      {currentScreen === 'login' && (
-        <LoginScreen onLogin={handleLogin} onGoToRegister={handleGoToRegister} />
-      )}
-
-      {currentScreen === 'register' && (
-        <RegisterScreen onRegister={handleRegister} onBackToLogin={handleBackToLogin} />
-      )}
-
-      {/* Telas principais (com layout e menu lateral) */}
-      {currentScreen !== 'login' && currentScreen !== 'register' && (
-        <AppLayout
-          currentPage={currentScreen}
-          onNavigate={handleNavigate}
-          onLogout={handleLogout}
-        >
-          {renderPageContent()}
-        </AppLayout>
-      )}
+      <Notifications position="top-right" />
+      <AuthWrapper />
     </MantineProvider>
   )
 }
 
 function App() {
   return (
-    <IntegratedProvider>
-      <AppContent />
-    </IntegratedProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   )
 }
 

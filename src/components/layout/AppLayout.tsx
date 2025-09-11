@@ -21,22 +21,23 @@ import {
 } from '@tabler/icons-react'
 import { notifications } from '@mantine/notifications'
 import { useTheme } from '../../hooks/useTheme'
+import { useAuth } from '../../hooks/useAuth'
 import { GlobalAddExpenseModal } from './GlobalAddExpenseModal'
 import logoColor from '../../assets/images/logo_color.png'
 import logoWhite from '../../assets/images/logo_white.png'
-import React, { useState } from "react";
+import React, { useState } from 'react'
 
 interface AppLayoutProps {
   currentPage: string;
   onNavigate: (page: string) => void;
-  onLogout: () => void;
   children: React.ReactNode;
 }
 
-export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLayoutProps) {
+export function AppLayout({ currentPage, onNavigate, children }: AppLayoutProps) {
   const [opened, { toggle, close }] = useDisclosure()
   const [modalOpened, setModalOpened] = useState(false)
   const { isDark } = useTheme()
+  const { logout,  } = useAuth()
 
   const menuItems = [
     { value: 'dashboard', label: 'Dashboard', icon: IconDashboard },
@@ -49,7 +50,7 @@ export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLa
 
   const handleLogout = () => {
     close() // Fechar menu antes do logout
-    onLogout()
+    logout()
     notifications.show({
       title: 'Logout realizado!',
       message: 'Até logo!',
@@ -168,7 +169,7 @@ export function AppLayout({ currentPage, onNavigate, onLogout, children }: AppLa
       <AppShell.Main
         onClick={opened ? close : undefined}
         style={opened ? { cursor: 'pointer' } : undefined}
-        pt="80px" // Adiciona padding top para compensar o header
+        pt="80px"
       >
         {children}
       </AppShell.Main>
