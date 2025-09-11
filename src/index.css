@@ -1,0 +1,21 @@
+/* Reset básico e configuração global */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+/* Forçar navbar a ocupar apenas 50% da tela no mobile */
+@media (max-width: 768px) {
+  .mantine-AppShell-navbar {
+    width: 50vw !important;
+    max-width: 50vw !important;
+  }
+}
