@@ -1,4 +1,4 @@
-import type { MonthlyData } from '../types/index';
+import type { MonthlyData } from '../types';
 
 // Dados mock para categorias com cores padronizadas
 export const categories = [
