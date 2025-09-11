@@ -6,5 +6,23 @@ export const useAlerts = () => {
   if (context === undefined) {
     throw new Error('useAlerts must be used within an AlertsProvider')
   }
-  return context
+
+  const {
+    alerts,
+    removeAlert,
+    markAllAsRead,
+    addAlert,
+    // Novas funções para integração com assinaturas
+    processSubscriptionAlerts,
+    setSubscriptions
+  } = context
+
+  return {
+    alerts,
+    removeAlert,
+    markAllAsRead,
+    addAlert,
+    processSubscriptionAlerts,
+    setSubscriptions
+  }
 }

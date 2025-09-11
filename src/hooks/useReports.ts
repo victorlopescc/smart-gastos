@@ -6,5 +6,23 @@ export const useReports = () => {
   if (context === undefined) {
     throw new Error('useReports must be used within a ReportsProvider')
   }
-  return context
+
+  const {
+    selectedPeriod,
+    setSelectedPeriod,
+    getFilteredReports,
+    exportToPDF,
+    // Novas funções para integração com assinaturas
+    setSubscriptions,
+    getSubscriptionAnalytics
+  } = context
+
+  return {
+    selectedPeriod,
+    setSelectedPeriod,
+    getFilteredReports,
+    exportToPDF,
+    setSubscriptions,
+    getSubscriptionAnalytics
+  }
 }

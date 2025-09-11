@@ -1,4 +1,5 @@
-import { createContext, useState, type ReactNode } from 'react'
+import { createContext, useState, useCallback, type ReactNode } from 'react'
+import type { Subscription } from '../types'
 import { monthlyReports } from '../data/mockData'
 import jsPDF from 'jspdf'
 
@@ -9,12 +10,22 @@ interface ReportsContextType {
   setSelectedPeriod: (period: PeriodFilter) => void
   getFilteredReports: () => typeof monthlyReports
   exportToPDF: () => void
+  // Funções para integração com assinaturas (sem alterar visual)
+  setSubscriptions: (subscriptions: Subscription[]) => void
+  getSubscriptionAnalytics: () => {
+    totalMonthly: number
+    activeCount: number
+    averageCost: number
+    categoryBreakdown: { [key: string]: number }
+    annualProjection: number
+  }
 }
 
 const ReportsContext = createContext<ReportsContextType | undefined>(undefined)
 
 export function ReportsProvider({ children }: { children: ReactNode }) {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('3m')
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
 
   const getFilteredReports = () => {
     const months = {
@@ -25,6 +36,28 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
 
     return monthlyReports.slice(0, months[selectedPeriod])
   }
+
+  // Análise automática de assinaturas para relatórios
+  const getSubscriptionAnalytics = useCallback(() => {
+    const activeSubscriptions = subscriptions.filter(sub => sub.status === 'Ativa')
+    const totalMonthly = activeSubscriptions.reduce((sum, sub) => sum + sub.amount, 0)
+    const averageCost = activeSubscriptions.length > 0 ? totalMonthly / activeSubscriptions.length : 0
+    const annualProjection = totalMonthly * 12
+
+    // Breakdown por categoria
+    const categoryBreakdown: { [key: string]: number } = {}
+    activeSubscriptions.forEach(sub => {
+      categoryBreakdown[sub.category] = (categoryBreakdown[sub.category] || 0) + sub.amount
+    })
+
+    return {
+      totalMonthly,
+      activeCount: activeSubscriptions.length,
+      averageCost,
+      categoryBreakdown,
+      annualProjection
+    }
+  }, [subscriptions])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -44,6 +77,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
 
   const exportToPDF = () => {
     const filteredReports = getFilteredReports()
+    const subscriptionAnalytics = getSubscriptionAnalytics()
     const doc = new jsPDF()
 
     // Configurações
@@ -54,7 +88,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     // Título do relatório
     doc.setFontSize(20)
     doc.setFont("helvetica", "bold")
-    doc.text('Relatório Financeiro', pageWidth / 2, yPosition, { align: 'center' })
+    doc.text('Relatório Financeiro Completo', pageWidth / 2, yPosition, { align: 'center' })
 
     yPosition += 15
     doc.setFontSize(12)
@@ -63,7 +97,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
 
     yPosition += 20
 
-    // Cálculos dos dados
+    // Cálculos dos dados originais
     const totalSaved = filteredReports.reduce((sum, report) => sum + report.saved, 0)
     const averageSpending = filteredReports.reduce((sum, report) => sum + report.spent, 0) / filteredReports.length
     const maxSavings = Math.max(...filteredReports.map(r => r.saved))
@@ -85,6 +119,41 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     yPosition += 8
     doc.text(`• Total Gasto no Período: ${formatCurrency(totalSpent)}`, margin, yPosition)
     yPosition += 20
+
+    // Seção de Assinaturas (integração invisível)
+    if (subscriptions.length > 0) {
+      doc.setFontSize(16)
+      doc.setFont("helvetica", "bold")
+      doc.text('Análise de Assinaturas', margin, yPosition)
+      yPosition += 15
+
+      doc.setFontSize(11)
+      doc.setFont("helvetica", "normal")
+      doc.text(`• Assinaturas Ativas: ${subscriptionAnalytics.activeCount}`, margin, yPosition)
+      yPosition += 8
+      doc.text(`• Custo Mensal Total: ${formatCurrency(subscriptionAnalytics.totalMonthly)}`, margin, yPosition)
+      yPosition += 8
+      doc.text(`• Custo Médio por Assinatura: ${formatCurrency(subscriptionAnalytics.averageCost)}`, margin, yPosition)
+      yPosition += 8
+      doc.text(`• Projeção Anual: ${formatCurrency(subscriptionAnalytics.annualProjection)}`, margin, yPosition)
+      yPosition += 15
+
+      // Breakdown por categoria
+      if (Object.keys(subscriptionAnalytics.categoryBreakdown).length > 0) {
+        doc.setFontSize(14)
+        doc.setFont("helvetica", "bold")
+        doc.text('Gastos por Categoria de Assinatura:', margin, yPosition)
+        yPosition += 10
+
+        doc.setFontSize(10)
+        doc.setFont("helvetica", "normal")
+        Object.entries(subscriptionAnalytics.categoryBreakdown).forEach(([category, amount]) => {
+          doc.text(`  • ${category}: ${formatCurrency(amount)}`, margin, yPosition)
+          yPosition += 7
+        })
+        yPosition += 15
+      }
+    }
 
     // Detalhamento por Mês
     doc.setFontSize(16)
@@ -159,7 +228,9 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         selectedPeriod,
         setSelectedPeriod,
         getFilteredReports,
-        exportToPDF
+        exportToPDF,
+        setSubscriptions,
+        getSubscriptionAnalytics
       }}
     >
       {children}

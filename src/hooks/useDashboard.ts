@@ -6,6 +6,29 @@ export function useDashboard() {
   if (!context) {
     throw new Error('useDashboard must be used within a DashboardProvider')
   }
-  const { monthlyData, addedExpenses, updateBudget, addExpense, editExpense, deleteExpense, getCurrentMonth } = context
-  return { monthlyData, addedExpenses, updateBudget, addExpense, editExpense, deleteExpense, getCurrentMonth }
+  const {
+    monthlyData,
+    addedExpenses,
+    updateBudget,
+    addExpense,
+    editExpense,
+    deleteExpense,
+    getCurrentMonth,
+    getSubscriptionExpenses,
+    getTotalSubscriptionCost,
+    setSubscriptions
+  } = context
+
+  return {
+    monthlyData,
+    addedExpenses,
+    updateBudget,
+    addExpense,
+    editExpense,
+    deleteExpense,
+    getCurrentMonth,
+    getSubscriptionExpenses,
+    getTotalSubscriptionCost,
+    setSubscriptions
+  }
 }

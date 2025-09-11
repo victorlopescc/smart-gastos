@@ -1,11 +1,7 @@
 import { useState } from 'react'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
-import { ThemeProvider } from './contexts/ThemeContext'
-import { SubscriptionsProvider } from './contexts/SubscriptionsContext'
-import { AlertsProvider } from './contexts/AlertsContext'
-import { ReportsProvider } from './contexts/ReportsContext'
-import { DashboardProvider } from './contexts/DashboardContext'
+import { IntegratedProvider } from './contexts/IntegratedProvider'
 import { useTheme } from './hooks/useTheme'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { RegisterScreen } from './components/auth/RegisterScreen'
@@ -94,17 +90,9 @@ function AppContent() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <DashboardProvider>
-        <SubscriptionsProvider>
-          <AlertsProvider>
-            <ReportsProvider>
-              <AppContent />
-            </ReportsProvider>
-          </AlertsProvider>
-        </SubscriptionsProvider>
-      </DashboardProvider>
-    </ThemeProvider>
+    <IntegratedProvider>
+      <AppContent />
+    </IntegratedProvider>
   )
 }
 
