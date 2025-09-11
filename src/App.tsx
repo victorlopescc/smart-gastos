@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { SubscriptionsProvider } from './contexts/SubscriptionsContext'
 import { useTheme } from './hooks/useTheme'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { RegisterScreen } from './components/auth/RegisterScreen'
@@ -88,7 +89,9 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <SubscriptionsProvider>
+        <AppContent />
+      </SubscriptionsProvider>
     </ThemeProvider>
   )
 }
