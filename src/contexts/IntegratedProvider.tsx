@@ -27,7 +27,9 @@ function IntegrationCoordinator({ children }: { children: ReactNode }) {
   } = useAlerts()
   const {
     setSubscriptions: setReportsSubscriptions,
-    setAlertHandlers: setReportsAlertHandlers
+    setAlertHandlers: setReportsAlertHandlers,
+    setDashboardData: setReportsDashboardData,
+    setExpenses: setReportsExpenses
   } = useReports()
 
   // Configura os handlers de alertas uma única vez
@@ -57,19 +59,21 @@ function IntegrationCoordinator({ children }: { children: ReactNode }) {
     setReportsSubscriptions(subscriptions)
   }, [subscriptions, setDashboardSubscriptions, setAlertsSubscriptions, processSubscriptionAlerts, setReportsSubscriptions])
 
-  // Processa alertas de orçamento quando dados do dashboard mudam
+  // NOVA INTEGRAÇÃO: Sincroniza dados do Dashboard com Reports
   useEffect(() => {
     if (monthlyData) {
+      setReportsDashboardData(monthlyData)
       processBudgetAlerts(monthlyData)
     }
-  }, [monthlyData, processBudgetAlerts])
+  }, [monthlyData, setReportsDashboardData, processBudgetAlerts])
 
-  // Processa alertas de gastos quando expenses mudam
+  // NOVA INTEGRAÇÃO: Sincroniza gastos com Reports
   useEffect(() => {
+    setReportsExpenses(addedExpenses)
     if (addedExpenses.length > 0 && monthlyData) {
       processExpenseAlerts(addedExpenses, monthlyData)
     }
-  }, [addedExpenses, monthlyData, processExpenseAlerts])
+  }, [addedExpenses, setReportsExpenses, monthlyData, processExpenseAlerts])
 
   // Verifica alertas de assinaturas periodicamente (a cada 30 minutos)
   useEffect(() => {

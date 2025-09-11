@@ -15,7 +15,11 @@ export const useReports = () => {
     // Novas funções para integração com assinaturas
     setSubscriptions,
     getSubscriptionAnalytics,
-    setAlertHandlers
+    setAlertHandlers,
+    // Novas integrações com Dashboard e Gastos
+    setDashboardData,
+    setExpenses,
+    getIntegratedReportData
   } = context
 
   return {
@@ -25,6 +29,9 @@ export const useReports = () => {
     exportToPDF,
     setSubscriptions,
     getSubscriptionAnalytics,
-    setAlertHandlers
+    setAlertHandlers,
+    setDashboardData,
+    setExpenses,
+    getIntegratedReportData
   }
 }

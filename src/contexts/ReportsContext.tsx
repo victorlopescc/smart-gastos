@@ -1,5 +1,5 @@
 import { createContext, useState, useCallback, type ReactNode } from 'react'
-import type { Subscription, ReportData } from '../types'
+import type { Subscription, ReportData, MonthlyData, Expense } from '../types'
 import { monthlyReports } from '../data/mockData'
 import jsPDF from 'jspdf'
 
@@ -23,6 +23,25 @@ interface ReportsContextType {
   setAlertHandlers: (handlers: {
     processReportAlerts: (reportData: ReportData) => void
   }) => void
+  // Novas integrações com Dashboard e Gastos
+  setDashboardData: (monthlyData: MonthlyData) => void
+  setExpenses: (expenses: Expense[]) => void
+  getIntegratedReportData: () => {
+    currentMonthSummary: {
+      budget: number
+      spent: number
+      saved: number
+      categoryBreakdown: { [key: string]: number }
+      subscriptionsCost: number
+      expensesCount: number
+    }
+    trends: {
+      spendingTrend: number
+      savingsTrend: number
+      subscriptionsTrend: number
+    }
+    insights: string[]
+  }
 }
 
 const ReportsContext = createContext<ReportsContextType | undefined>(undefined)
@@ -30,6 +49,10 @@ const ReportsContext = createContext<ReportsContextType | undefined>(undefined)
 export function ReportsProvider({ children }: { children: ReactNode }) {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('3m')
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+
+  // Estados para integração completa (invisível ao usuário)
+  const [dashboardData, setDashboardData] = useState<MonthlyData | null>(null)
+  const [expenses, setExpenses] = useState<Expense[]>([])
 
   // Handlers para alertas (integração invisível)
   const [alertHandlers, setAlertHandlers] = useState<{
@@ -99,6 +122,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
   const exportToPDF = () => {
     const filteredReports = getFilteredReports()
     const subscriptionAnalytics = getSubscriptionAnalytics()
+    const integratedData = getIntegratedReportData()
     const doc = new jsPDF()
 
     // Configurações
@@ -109,7 +133,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     // Título do relatório
     doc.setFontSize(20)
     doc.setFont("helvetica", "bold")
-    doc.text('Relatório Financeiro Completo', pageWidth / 2, yPosition, { align: 'center' })
+    doc.text('Relatório Financeiro Integrado', pageWidth / 2, yPosition, { align: 'center' })
 
     yPosition += 15
     doc.setFontSize(12)
@@ -118,63 +142,103 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
 
     yPosition += 20
 
-    // Cálculos dos dados originais
-    const totalSaved = filteredReports.reduce((sum, report) => sum + report.saved, 0)
-    const averageSpending = filteredReports.reduce((sum, report) => sum + report.spent, 0) / filteredReports.length
-    const maxSavings = Math.max(...filteredReports.map(r => r.saved))
-    const totalSpent = filteredReports.reduce((sum, report) => sum + report.spent, 0)
-
-    // Resumo Executivo
+    // NOVA SEÇÃO: Resumo do Mês Atual Integrado
     doc.setFontSize(16)
     doc.setFont("helvetica", "bold")
-    doc.text('Resumo Executivo', margin, yPosition)
+    doc.text('Resumo do Mês Atual', margin, yPosition)
     yPosition += 15
 
     doc.setFontSize(11)
     doc.setFont("helvetica", "normal")
-    doc.text(`• Economia Total: ${formatCurrency(totalSaved)}`, margin, yPosition)
+    doc.text(`• Orçamento: ${formatCurrency(integratedData.currentMonthSummary.budget)}`, margin, yPosition)
     yPosition += 8
-    doc.text(`• Gasto Médio Mensal: ${formatCurrency(averageSpending)}`, margin, yPosition)
+    doc.text(`• Gasto Total: ${formatCurrency(integratedData.currentMonthSummary.spent)}`, margin, yPosition)
     yPosition += 8
-    doc.text(`• Maior Economia: ${formatCurrency(maxSavings)}`, margin, yPosition)
+    doc.text(`• Economia: ${formatCurrency(integratedData.currentMonthSummary.saved)}`, margin, yPosition)
     yPosition += 8
-    doc.text(`• Total Gasto no Período: ${formatCurrency(totalSpent)}`, margin, yPosition)
+    doc.text(`• Gastos com Assinaturas: ${formatCurrency(integratedData.currentMonthSummary.subscriptionsCost)}`, margin, yPosition)
+    yPosition += 8
+    doc.text(`• Total de Transações: ${integratedData.currentMonthSummary.expensesCount}`, margin, yPosition)
     yPosition += 20
 
-    // Seção de Assinaturas (integração invisível)
-    if (subscriptions.length > 0) {
+    // NOVA SEÇÃO: Análise de Tendências
+    doc.setFontSize(16)
+    doc.setFont("helvetica", "bold")
+    doc.text('Análise de Tendências', margin, yPosition)
+    yPosition += 15
+
+    doc.setFontSize(11)
+    doc.setFont("helvetica", "normal")
+    const spendingTrendText = integratedData.trends.spendingTrend > 0 ?
+      `↗ Aumento de ${integratedData.trends.spendingTrend.toFixed(1)}%` :
+      `↘ Redução de ${Math.abs(integratedData.trends.spendingTrend).toFixed(1)}%`
+    doc.text(`• Tendência de Gastos: ${spendingTrendText}`, margin, yPosition)
+    yPosition += 8
+
+    const savingsTrendText = integratedData.trends.savingsTrend > 0 ?
+      `↗ Melhoria de ${integratedData.trends.savingsTrend.toFixed(1)}%` :
+      `↘ Redução de ${Math.abs(integratedData.trends.savingsTrend).toFixed(1)}%`
+    doc.text(`• Tendência de Economia: ${savingsTrendText}`, margin, yPosition)
+    yPosition += 8
+
+    if (integratedData.trends.subscriptionsTrend !== 0) {
+      const subscriptionsTrendText = integratedData.trends.subscriptionsTrend > 0 ?
+        `↗ Crescimento de ${integratedData.trends.subscriptionsTrend.toFixed(1)}%` :
+        `↘ Redução de ${Math.abs(integratedData.trends.subscriptionsTrend).toFixed(1)}%`
+      doc.text(`• Tendência de Assinaturas: ${subscriptionsTrendText}`, margin, yPosition)
+      yPosition += 8
+    }
+    yPosition += 12
+
+    // NOVA SEÇÃO: Insights Automáticos
+    if (integratedData.insights.length > 0) {
       doc.setFontSize(16)
       doc.setFont("helvetica", "bold")
-      doc.text('Análise de Assinaturas', margin, yPosition)
+      doc.text('Insights e Recomendações', margin, yPosition)
       yPosition += 15
 
       doc.setFontSize(11)
       doc.setFont("helvetica", "normal")
-      doc.text(`• Assinaturas Ativas: ${subscriptionAnalytics.activeCount}`, margin, yPosition)
-      yPosition += 8
-      doc.text(`• Custo Mensal Total: ${formatCurrency(subscriptionAnalytics.totalMonthly)}`, margin, yPosition)
-      yPosition += 8
-      doc.text(`• Custo Médio por Assinatura: ${formatCurrency(subscriptionAnalytics.averageCost)}`, margin, yPosition)
-      yPosition += 8
-      doc.text(`• Projeção Anual: ${formatCurrency(subscriptionAnalytics.annualProjection)}`, margin, yPosition)
-      yPosition += 15
-
-      // Breakdown por categoria
-      if (Object.keys(subscriptionAnalytics.categoryBreakdown).length > 0) {
-        doc.setFontSize(14)
-        doc.setFont("helvetica", "bold")
-        doc.text('Gastos por Categoria de Assinatura:', margin, yPosition)
-        yPosition += 10
-
-        doc.setFontSize(10)
-        doc.setFont("helvetica", "normal")
-        Object.entries(subscriptionAnalytics.categoryBreakdown).forEach(([category, amount]) => {
-          doc.text(`  • ${category}: ${formatCurrency(amount)}`, margin, yPosition)
-          yPosition += 7
-        })
-        yPosition += 15
-      }
+      integratedData.insights.forEach(insight => {
+        if (yPosition > 250) {
+          doc.addPage()
+          yPosition = 30
+        }
+        doc.text(`• ${insight}`, margin, yPosition)
+        yPosition += 8
+      })
+      yPosition += 12
     }
+
+    // Seção de Categorias Integradas (Dashboard + Assinaturas)
+    doc.setFontSize(16)
+    doc.setFont("helvetica", "bold")
+    doc.text('Distribuição de Gastos por Categoria', margin, yPosition)
+    yPosition += 15
+
+    doc.setFontSize(11)
+    doc.setFont("helvetica", "normal")
+
+    // Combinar categorias do dashboard com assinaturas
+    const allCategories = { ...integratedData.currentMonthSummary.categoryBreakdown }
+    Object.entries(subscriptionAnalytics.categoryBreakdown).forEach(([category, amount]) => {
+      allCategories[category] = (allCategories[category] || 0) + amount
+    })
+
+    const sortedCategories = Object.entries(allCategories)
+      .sort(([,a], [,b]) => b - a)
+      .filter(([,amount]) => amount > 0)
+
+    sortedCategories.forEach(([category, amount]) => {
+      if (yPosition > 270) {
+        doc.addPage()
+        yPosition = 30
+      }
+      const percentage = ((amount / integratedData.currentMonthSummary.spent) * 100).toFixed(1)
+      doc.text(`• ${category}: ${formatCurrency(amount)} (${percentage}%)`, margin, yPosition)
+      yPosition += 7
+    })
+    yPosition += 15
 
     // Detalhamento por Mês
     doc.setFontSize(16)
@@ -233,15 +297,95 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         })
     }
 
-    // Rodapé
+    // Rodapé atualizado
     const currentDate = new Date().toLocaleDateString('pt-BR')
     doc.setFontSize(8)
     doc.setFont("helvetica", "italic")
-    doc.text(`Relatório gerado em ${currentDate}`, margin, doc.internal.pageSize.height - 10)
+    doc.text(`Relatório integrado gerado em ${currentDate}`, margin, doc.internal.pageSize.height - 10)
 
     // Download do PDF
-    doc.save(`relatorio-financeiro-${selectedPeriod}-${currentDate.replace(/\//g, '-')}.pdf`)
+    doc.save(`relatorio-integrado-${selectedPeriod}-${currentDate.replace(/\//g, '-')}.pdf`)
   }
+
+  // Nova função para análise integrada de dados
+  const getIntegratedReportData = useCallback(() => {
+    const subscriptionAnalytics = getSubscriptionAnalytics()
+    const currentMonth = new Date().getMonth()
+    const currentYear = new Date().getFullYear()
+
+    // Filtrar gastos do mês atual
+    const currentMonthExpenses = expenses.filter(expense => {
+      const expenseDate = new Date(expense.date)
+      return expenseDate.getMonth() === currentMonth &&
+             expenseDate.getFullYear() === currentYear
+    })
+
+    // Resumo do mês atual integrando todas as fontes
+    const currentMonthSummary = {
+      budget: dashboardData?.budget || 0,
+      spent: dashboardData?.spent || 0,
+      saved: Math.max(0, (dashboardData?.budget || 0) - (dashboardData?.spent || 0)),
+      categoryBreakdown: dashboardData?.categories.reduce((acc, cat) => {
+        acc[cat.name] = cat.value
+        return acc
+      }, {} as { [key: string]: number }) || {},
+      subscriptionsCost: subscriptionAnalytics.totalMonthly,
+      expensesCount: currentMonthExpenses.length
+    }
+
+    // Calcular tendências baseadas nos relatórios históricos
+    const filteredReports = getFilteredReports()
+    const trends = {
+      spendingTrend: 0,
+      savingsTrend: 0,
+      subscriptionsTrend: 0
+    }
+
+    if (filteredReports.length >= 2) {
+      const latest = filteredReports[0]
+      const previous = filteredReports[1]
+
+      trends.spendingTrend = ((latest.spent - previous.spent) / previous.spent) * 100
+      trends.savingsTrend = ((latest.saved - previous.saved) / previous.saved) * 100
+
+      // Tendência de assinaturas (estimativa baseada no crescimento de gastos)
+      trends.subscriptionsTrend = subscriptionAnalytics.totalMonthly > 0 ?
+        Math.min(trends.spendingTrend * 0.3, 20) : 0
+    }
+
+    // Gerar insights automaticamente
+    const insights: string[] = []
+
+    if (currentMonthSummary.subscriptionsCost > 0) {
+      const subscriptionPercentage = (currentMonthSummary.subscriptionsCost / currentMonthSummary.budget) * 100
+      if (subscriptionPercentage > 20) {
+        insights.push(`Assinaturas representam ${subscriptionPercentage.toFixed(1)}% do orçamento`)
+      }
+    }
+
+    if (trends.spendingTrend > 15) {
+      insights.push(`Gastos aumentaram ${trends.spendingTrend.toFixed(1)}% comparado ao período anterior`)
+    }
+
+    if (trends.savingsTrend < -10) {
+      insights.push(`Economia diminuiu ${Math.abs(trends.savingsTrend).toFixed(1)}% no período`)
+    }
+
+    if (currentMonthSummary.expensesCount > 50) {
+      insights.push(`Alto volume de transações: ${currentMonthSummary.expensesCount} gastos registrados`)
+    }
+
+    const budgetUsage = (currentMonthSummary.spent / currentMonthSummary.budget) * 100
+    if (budgetUsage > 90) {
+      insights.push(`Utilização crítica do orçamento: ${budgetUsage.toFixed(1)}%`)
+    }
+
+    return {
+      currentMonthSummary,
+      trends,
+      insights
+    }
+  }, [subscriptions, dashboardData, expenses, getSubscriptionAnalytics, getFilteredReports])
 
   const setAlertHandlersFunc = useCallback((handlers: {
     processReportAlerts: (reportData: ReportData) => void
@@ -258,7 +402,10 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         exportToPDF,
         setSubscriptions,
         getSubscriptionAnalytics,
-        setAlertHandlers: setAlertHandlersFunc
+        setAlertHandlers: setAlertHandlersFunc,
+        setDashboardData,
+        setExpenses,
+        getIntegratedReportData
       }}
     >
       {children}
