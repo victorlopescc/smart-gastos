@@ -14,7 +14,11 @@ export const useAlerts = () => {
     addAlert,
     // Novas funções para integração com assinaturas
     processSubscriptionAlerts,
-    setSubscriptions
+    setSubscriptions,
+    // Funções para integração com dashboard e reports
+    processBudgetAlerts,
+    processExpenseAlerts,
+    processReportAlerts
   } = context
 
   return {
@@ -23,6 +27,9 @@ export const useAlerts = () => {
     markAllAsRead,
     addAlert,
     processSubscriptionAlerts,
-    setSubscriptions
+    setSubscriptions,
+    processBudgetAlerts,
+    processExpenseAlerts,
+    processReportAlerts
   }
 }

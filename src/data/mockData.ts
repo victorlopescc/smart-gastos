@@ -28,11 +28,11 @@ export const recentExpenses = [
 
 // Dados mock para assinaturas
 export const subscriptions: Subscription[] = [
-  { id: 1, name: 'Netflix', category: 'Entretenimento', amount: 32.90, nextPayment: '2025-02-15', status: 'Ativa' },
-  { id: 2, name: 'Spotify', category: 'Entretenimento', amount: 21.90, nextPayment: '2025-02-08', status: 'Ativa' },
-  { id: 3, name: 'Amazon Prime', category: 'Entretenimento', amount: 14.90, nextPayment: '2025-02-20', status: 'Ativa' },
-  { id: 4, name: 'iCloud', category: 'Tecnologia', amount: 9.90, nextPayment: '2025-02-12', status: 'Ativa' },
-  { id: 5, name: 'Adobe Creative', category: 'Trabalho', amount: 85.00, nextPayment: '2025-02-25', status: 'Pendente' }
+  { id: 1, name: 'Netflix', category: 'Entretenimento', amount: 32.90, nextPayment: '2025-01-15', status: 'Ativa' },
+  { id: 2, name: 'Spotify', category: 'Entretenimento', amount: 21.90, nextPayment: '2025-01-18', status: 'Ativa' },
+  { id: 3, name: 'Amazon Prime', category: 'Entretenimento', amount: 14.90, nextPayment: '2025-01-20', status: 'Ativa' },
+  { id: 4, name: 'iCloud', category: 'Tecnologia', amount: 9.90, nextPayment: '2025-01-25', status: 'Ativa' },
+  { id: 5, name: 'Adobe Creative', category: 'Trabalho', amount: 85.00, nextPayment: '2025-01-12', status: 'Pendente' }
 ];
 
 // Dados mock para alertas

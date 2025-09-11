@@ -12,9 +12,37 @@ import { useReports } from '../hooks/useReports'
 // Componente interno que coordena a integração (invisível para o usuário)
 function IntegrationCoordinator({ children }: { children: ReactNode }) {
   const { subscriptions } = useSubscriptions()
-  const { setSubscriptions: setDashboardSubscriptions } = useDashboard()
-  const { processSubscriptionAlerts, setSubscriptions: setAlertsSubscriptions } = useAlerts()
-  const { setSubscriptions: setReportsSubscriptions } = useReports()
+  const {
+    setSubscriptions: setDashboardSubscriptions,
+    setAlertHandlers: setDashboardAlertHandlers,
+    monthlyData,
+    addedExpenses
+  } = useDashboard()
+  const {
+    processSubscriptionAlerts,
+    setSubscriptions: setAlertsSubscriptions,
+    processBudgetAlerts,
+    processExpenseAlerts,
+    processReportAlerts
+  } = useAlerts()
+  const {
+    setSubscriptions: setReportsSubscriptions,
+    setAlertHandlers: setReportsAlertHandlers
+  } = useReports()
+
+  // Configura os handlers de alertas uma única vez
+  useEffect(() => {
+    // Dashboard -> Alertas (orçamento e gastos)
+    setDashboardAlertHandlers({
+      processBudgetAlerts,
+      processExpenseAlerts
+    })
+
+    // Reports -> Alertas (tendências)
+    setReportsAlertHandlers({
+      processReportAlerts
+    })
+  }, [setDashboardAlertHandlers, processBudgetAlerts, processExpenseAlerts, setReportsAlertHandlers, processReportAlerts])
 
   // Sincroniza automaticamente as assinaturas com todos os contextos
   useEffect(() => {
@@ -29,14 +57,39 @@ function IntegrationCoordinator({ children }: { children: ReactNode }) {
     setReportsSubscriptions(subscriptions)
   }, [subscriptions, setDashboardSubscriptions, setAlertsSubscriptions, processSubscriptionAlerts, setReportsSubscriptions])
 
-  // Verifica alertas periodicamente (a cada 5 minutos)
+  // Processa alertas de orçamento quando dados do dashboard mudam
+  useEffect(() => {
+    if (monthlyData) {
+      processBudgetAlerts(monthlyData)
+    }
+  }, [monthlyData, processBudgetAlerts])
+
+  // Processa alertas de gastos quando expenses mudam
+  useEffect(() => {
+    if (addedExpenses.length > 0 && monthlyData) {
+      processExpenseAlerts(addedExpenses, monthlyData)
+    }
+  }, [addedExpenses, monthlyData, processExpenseAlerts])
+
+  // Verifica alertas de assinaturas periodicamente (a cada 30 minutos)
   useEffect(() => {
     const interval = setInterval(() => {
       processSubscriptionAlerts(subscriptions)
-    }, 5 * 60 * 1000) // 5 minutos
+    }, 30 * 60 * 1000) // 30 minutos
 
     return () => clearInterval(interval)
   }, [subscriptions, processSubscriptionAlerts])
+
+  // Verifica alertas de orçamento periodicamente (a cada hora)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (monthlyData) {
+        processBudgetAlerts(monthlyData)
+      }
+    }, 60 * 60 * 1000) // 1 hora
+
+    return () => clearInterval(interval)
+  }, [monthlyData, processBudgetAlerts])
 
   return <>{children}</>
 }
@@ -46,6 +99,7 @@ interface IntegrationContextType {
   isIntegrated: boolean
   subscriptionsCount: number
   lastSync: Date | null
+  alertsEnabled: boolean
 }
 
 const IntegrationContext = createContext<IntegrationContextType | undefined>(undefined)
@@ -62,7 +116,8 @@ export function IntegratedProvider({ children }: { children: ReactNode }) {
                 value={{
                   isIntegrated: true,
                   subscriptionsCount: 0,
-                  lastSync: null
+                  lastSync: new Date(),
+                  alertsEnabled: true
                 }}
               >
                 <IntegrationCoordinator>

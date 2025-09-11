@@ -14,6 +14,11 @@ interface DashboardContextType {
   getSubscriptionExpenses: () => Expense[]
   getTotalSubscriptionCost: () => number
   setSubscriptions: (subscriptions: Subscription[]) => void
+  // Integração com alertas
+  setAlertHandlers: (handlers: {
+    processBudgetAlerts: (monthlyData: MonthlyData) => void
+    processExpenseAlerts: (expenses: Expense[], monthlyData: MonthlyData) => void
+  }) => void
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined)
@@ -21,6 +26,12 @@ const DashboardContext = createContext<DashboardContextType | undefined>(undefin
 export function DashboardProvider({ children }: { children: ReactNode }) {
   // Estado interno para assinaturas (integração invisível)
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+
+  // Handlers para alertas (integração invisível)
+  const [alertHandlers, setAlertHandlers] = useState<{
+    processBudgetAlerts?: (monthlyData: MonthlyData) => void
+    processExpenseAlerts?: (expenses: Expense[], monthlyData: MonthlyData) => void
+  }>({})
 
   const getCurrentMonth = () => {
     const now = new Date()
@@ -120,16 +131,25 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const allCurrentMonthExpenses = [...currentMonthAddedExpenses, ...currentMonthExpenses, ...subscriptionExpenses]
     const newSpent = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
 
-    setMonthlyData(prev => ({
-      ...prev,
-      budget: budget ?? prev.budget,
+    const newMonthlyData = {
+      budget: budget ?? monthlyData.budget,
       spent: newSpent,
       categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
       recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
         new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
       )
-    }))
-  }, [currentMonthExpenses, subscriptionExpenses])
+    }
+
+    setMonthlyData(newMonthlyData)
+
+    // Processar alertas automaticamente (invisível ao usuário)
+    if (alertHandlers.processBudgetAlerts) {
+      alertHandlers.processBudgetAlerts(newMonthlyData)
+    }
+    if (alertHandlers.processExpenseAlerts) {
+      alertHandlers.processExpenseAlerts(allCurrentMonthExpenses, newMonthlyData)
+    }
+  }, [currentMonthExpenses, subscriptionExpenses, monthlyData.budget, alertHandlers])
 
   // Recalcula quando as assinaturas mudam
   useEffect(() => {
@@ -138,10 +158,16 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   const updateBudget = (newBudget: number) => {
     if (newBudget > 0) {
-      setMonthlyData(prev => ({
-        ...prev,
+      const newMonthlyData = {
+        ...monthlyData,
         budget: newBudget
-      }))
+      }
+      setMonthlyData(newMonthlyData)
+
+      // Processar alertas de orçamento automaticamente
+      if (alertHandlers.processBudgetAlerts) {
+        alertHandlers.processBudgetAlerts(newMonthlyData)
+      }
     }
   }
 
@@ -181,6 +207,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     })
   }
 
+  const setAlertHandlersFunc = useCallback((handlers: {
+    processBudgetAlerts: (monthlyData: MonthlyData) => void
+    processExpenseAlerts: (expenses: Expense[], monthlyData: MonthlyData) => void
+  }) => {
+    setAlertHandlers(handlers)
+  }, [])
+
   return (
     <DashboardContext.Provider
       value={{
@@ -193,7 +226,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         getCurrentMonth,
         getSubscriptionExpenses,
         getTotalSubscriptionCost,
-        setSubscriptions
+        setSubscriptions,
+        setAlertHandlers: setAlertHandlersFunc
       }}
     >
       {children}

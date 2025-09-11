@@ -1,5 +1,5 @@
 import { createContext, useState, useCallback, type ReactNode } from 'react'
-import type { Subscription } from '../types'
+import type { Subscription, ReportData } from '../types'
 import { monthlyReports } from '../data/mockData'
 import jsPDF from 'jspdf'
 
@@ -19,6 +19,10 @@ interface ReportsContextType {
     categoryBreakdown: { [key: string]: number }
     annualProjection: number
   }
+  // Integração com alertas
+  setAlertHandlers: (handlers: {
+    processReportAlerts: (reportData: ReportData) => void
+  }) => void
 }
 
 const ReportsContext = createContext<ReportsContextType | undefined>(undefined)
@@ -27,6 +31,11 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('3m')
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
 
+  // Handlers para alertas (integração invisível)
+  const [alertHandlers, setAlertHandlers] = useState<{
+    processReportAlerts?: (reportData: ReportData) => void
+  }>({})
+
   const getFilteredReports = () => {
     const months = {
       '3m': 3,
@@ -34,7 +43,19 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
       '1y': 12
     }
 
-    return monthlyReports.slice(0, months[selectedPeriod])
+    const reports = monthlyReports.slice(0, months[selectedPeriod])
+
+    // Processar alertas automaticamente quando dados do relatório mudam
+    if (alertHandlers.processReportAlerts) {
+      const reportData = {
+        trends: reports,
+        period: selectedPeriod,
+        subscriptionAnalytics: getSubscriptionAnalytics()
+      }
+      alertHandlers.processReportAlerts(reportData)
+    }
+
+    return reports
   }
 
   // Análise automática de assinaturas para relatórios
@@ -222,6 +243,12 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     doc.save(`relatorio-financeiro-${selectedPeriod}-${currentDate.replace(/\//g, '-')}.pdf`)
   }
 
+  const setAlertHandlersFunc = useCallback((handlers: {
+    processReportAlerts: (reportData: ReportData) => void
+  }) => {
+    setAlertHandlers(handlers)
+  }, [])
+
   return (
     <ReportsContext.Provider
       value={{
@@ -230,7 +257,8 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         getFilteredReports,
         exportToPDF,
         setSubscriptions,
-        getSubscriptionAnalytics
+        getSubscriptionAnalytics,
+        setAlertHandlers: setAlertHandlersFunc
       }}
     >
       {children}

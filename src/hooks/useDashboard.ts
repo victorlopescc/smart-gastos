@@ -16,7 +16,8 @@ export function useDashboard() {
     getCurrentMonth,
     getSubscriptionExpenses,
     getTotalSubscriptionCost,
-    setSubscriptions
+    setSubscriptions,
+    setAlertHandlers
   } = context
 
   return {
@@ -29,6 +30,7 @@ export function useDashboard() {
     getCurrentMonth,
     getSubscriptionExpenses,
     getTotalSubscriptionCost,
-    setSubscriptions
+    setSubscriptions,
+    setAlertHandlers
   }
 }

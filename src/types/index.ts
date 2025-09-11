@@ -56,3 +56,15 @@ export interface UserData {
     darkMode: boolean;
   };
 }
+
+export interface ReportData {
+  trends: MonthlyReport[];
+  period: string;
+  subscriptionAnalytics: {
+    totalMonthly: number;
+    activeCount: number;
+    averageCost: number;
+    categoryBreakdown: { [key: string]: number };
+    annualProjection: number;
+  };
+}
