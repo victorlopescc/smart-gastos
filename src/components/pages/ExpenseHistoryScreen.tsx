@@ -13,11 +13,13 @@ import {
   ActionIcon,
   Modal
 } from '@mantine/core'
+import { useMediaQuery } from '@mantine/hooks'
 import { IconSearch, IconFilter, IconEdit, IconTrash } from '@tabler/icons-react'
 import { useDashboard } from '../../hooks/useDashboard'
 import { useReports } from '../../hooks/useReports'
 import { useAlerts } from '../../hooks/useAlerts'
 import { useAuth } from '../../hooks/useAuth'
+import { useTheme } from '../../hooks/useTheme'
 import { categories as categoryColors, recentExpenses, historicalExpenses } from '../../data/mockData'
 import { createAmountChangeHandler, parseCurrencyToNumber } from '../../utils/formatters'
 import type { Expense } from '../../types'
@@ -31,6 +33,8 @@ interface ExtendedExpense extends Expense {
 
 export function ExpenseHistoryScreen() {
   const { user } = useAuth()
+  const { isDark } = useTheme()
+  const isMobile = useMediaQuery('(max-width: 768px)')
   const { addedExpenses, editExpense, deleteExpense, getSubscriptionExpenses, monthlyData } = useDashboard()
   const { setDashboardData, setExpenses } = useReports()
   const { processExpenseAlerts } = useAlerts()
@@ -231,60 +235,132 @@ export function ExpenseHistoryScreen() {
         <Card shadow="sm" padding="lg" radius="md" withBorder>
           <Text size="xl" fw={600} mb="lg">Histórico de Gastos</Text>
 
-          {/* Filtros */}
-          <Card shadow="xs" padding="md" radius="md" withBorder mb="lg" style={{ backgroundColor: '#f8f9fa' }}>
-            <Text size="sm" fw={500} mb="md" c="dimmed">Filtros</Text>
+          {/* Filtros - Ocultos no mobile */}
+          {!isMobile && (
+            <Card
+              shadow="xs"
+              padding="md"
+              radius="md"
+              withBorder
+              mb="lg"
+              style={{
+                backgroundColor: isDark ? '#2e2e2e' : '#f8f9fa',
+                borderColor: isDark ? '#404040' : '#dee2e6'
+              }}
+            >
+              <Text size="sm" fw={500} mb="md" c={isDark ? 'gray.3' : 'dimmed'}>Filtros</Text>
 
-            <Group grow align="flex-end">
-              <TextInput
-                label="Buscar por descrição"
-                placeholder="Digite a descrição do gasto..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                leftSection={<IconSearch size={16} />}
-              />
+              <Group grow align="flex-end">
+                <TextInput
+                  label="Buscar por descrição"
+                  placeholder="Digite a descrição do gasto..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  leftSection={<IconSearch size={16} />}
+                  styles={{
+                    label: { color: isDark ? '#c1c2c5' : undefined },
+                    input: {
+                      backgroundColor: isDark ? '#1a1b1e' : undefined,
+                      borderColor: isDark ? '#373a40' : undefined,
+                      color: isDark ? '#c1c2c5' : undefined,
+                      '&::placeholder': {
+                        color: isDark ? '#868e96' : undefined
+                      }
+                    }
+                  }}
+                />
 
-              <Select
-                label="Categoria"
-                placeholder="Todas as categorias"
-                data={categories}
-                value={categoryFilter}
-                onChange={setCategoryFilter}
-                clearable
-                leftSection={<IconFilter size={16} />}
-                searchable={false}
-                allowDeselect={true}
-                withCheckIcon={false}
-                comboboxProps={{
-                  transitionProps: { duration: 0 },
-                  shadow: 'md',
-                  withinPortal: false
-                }}
-              />
+                <Select
+                  label="Categoria"
+                  placeholder="Todas as categorias"
+                  data={categories}
+                  value={categoryFilter}
+                  onChange={setCategoryFilter}
+                  clearable
+                  leftSection={<IconFilter size={16} />}
+                  searchable={false}
+                  allowDeselect={true}
+                  withCheckIcon={false}
+                  comboboxProps={{
+                    transitionProps: { duration: 0 },
+                    shadow: 'md',
+                    withinPortal: false
+                  }}
+                  styles={{
+                    label: { color: isDark ? '#c1c2c5' : undefined },
+                    input: {
+                      backgroundColor: isDark ? '#1a1b1e' : undefined,
+                      borderColor: isDark ? '#373a40' : undefined,
+                      color: isDark ? '#c1c2c5' : undefined
+                    },
+                    dropdown: {
+                      backgroundColor: isDark ? '#1a1b1e' : undefined,
+                      borderColor: isDark ? '#373a40' : undefined
+                    },
+                    option: {
+                      backgroundColor: isDark ? '#1a1b1e' : undefined,
+                      color: isDark ? '#c1c2c5' : undefined,
+                      '&[data-selected]': {
+                        backgroundColor: isDark ? '#339af0' : undefined
+                      },
+                      '&[data-hovered]': {
+                        backgroundColor: isDark ? '#2e2e2e' : undefined
+                      }
+                    }
+                  }}
+                />
 
-              <TextInput
-                label="Data de"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+                <TextInput
+                  label="Data de"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  styles={{
+                    label: { color: isDark ? '#c1c2c5' : undefined },
+                    input: {
+                      backgroundColor: isDark ? '#1a1b1e' : undefined,
+                      borderColor: isDark ? '#373a40' : undefined,
+                      color: isDark ? '#c1c2c5' : undefined,
+                      colorScheme: isDark ? 'dark' : 'light'
+                    }
+                  }}
+                />
 
-              <TextInput
-                label="Data até"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
+                <TextInput
+                  label="Data até"
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  styles={{
+                    label: { color: isDark ? '#c1c2c5' : undefined },
+                    input: {
+                      backgroundColor: isDark ? '#1a1b1e' : undefined,
+                      borderColor: isDark ? '#373a40' : undefined,
+                      color: isDark ? '#c1c2c5' : undefined,
+                      colorScheme: isDark ? 'dark' : 'light'
+                    }
+                  }}
+                />
 
-              <Button
-                variant="outline"
-                onClick={clearFilters}
-                color="#0ca167"
-              >
-                Limpar Filtros
-              </Button>
-            </Group>
-          </Card>
+                <Button
+                  variant="outline"
+                  onClick={clearFilters}
+                  color="#0ca167"
+                  styles={{
+                    root: {
+                      borderColor: '#0ca167',
+                      color: '#0ca167',
+                      '&:hover': {
+                        backgroundColor: isDark ? 'rgba(12, 161, 103, 0.1)' : 'rgba(12, 161, 103, 0.05)'
+                      }
+                    }
+                  }}
+                >
+                  Limpar Filtros
+                </Button>
+              </Group>
+            </Card>
+          )}
 
           {/* Resumo dos resultados */}
           <Group justify="space-between" mb="md">
