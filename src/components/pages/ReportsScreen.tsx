@@ -57,8 +57,12 @@ export function ReportsScreen() {
   }
 
   const totalSaved = filteredReports.reduce((sum, report) => sum + report.saved, 0)
-  const averageSpending = filteredReports.reduce((sum, report) => sum + report.spent, 0) / filteredReports.length
-  const maxSavings = Math.max(...filteredReports.map(r => r.saved))
+  const averageSpending = filteredReports.length > 0
+    ? filteredReports.reduce((sum, report) => sum + report.spent, 0) / filteredReports.length
+    : 0
+  const maxSavings = filteredReports.length > 0
+    ? Math.max(...filteredReports.map(r => r.saved))
+    : 0
 
   const handlePeriodChange = (value: string | null) => {
     if (value) {
