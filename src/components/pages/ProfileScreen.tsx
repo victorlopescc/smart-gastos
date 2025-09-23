@@ -238,7 +238,7 @@ export function ProfileScreen() {
                                 <Switch
                                     label="Modo escuro"
                                     checked={isDark}
-                                    onChange={toggleTheme}
+                                    onChange={() => toggleTheme()}
                                 />
                             </Stack>
                         </Card>

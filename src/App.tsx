@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { MantineProvider } from '@mantine/core'
 import { Notifications } from '@mantine/notifications'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { useAuth } from './hooks/useAuth'
-import { useTheme } from './hooks/useTheme'
 import { IntegratedProvider } from './contexts/IntegratedProvider'
 import { LoginScreen } from './components/auth/LoginScreen'
 import { RegisterScreen } from './components/auth/RegisterScreen'
@@ -87,33 +86,23 @@ function AuthenticatedApp() {
 }
 
 function AppContent() {
-  const { isDark } = useTheme()
-  // Força re-render quando o tema muda
-  const [themeKey, setThemeKey] = useState(0)
-
-  useEffect(() => {
-    setThemeKey(prev => prev + 1)
-  }, [isDark])
-
   return (
-    <MantineProvider
-      key={themeKey}
-      defaultColorScheme={isDark ? 'dark' : 'light'}
-      forceColorScheme={isDark ? 'dark' : 'light'}
-    >
+    <>
       <Notifications position="bottom-right" />
       <AuthWrapper />
-    </MantineProvider>
+    </>
   )
 }
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <MantineProvider>
+        <ThemeProvider>
+          <AppContent />
+        </ThemeProvider>
+      </MantineProvider>
+    </AuthProvider>
   )
 }
 
