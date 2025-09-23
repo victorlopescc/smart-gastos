@@ -26,6 +26,30 @@ export const recentExpenses = [
   { id: 10, description: 'Lanchonete', category: 'Alimentação', amount: 22.80, date: '2025-01-05' }
 ];
 
+// Gastos históricos dos meses anteriores (para o histórico completo)
+export const historicalExpenses = [
+  // Dezembro 2024
+  { id: 101, description: 'Supermercado Carrefour', category: 'Alimentação', amount: 156.30, date: '2024-12-28' },
+  { id: 102, description: 'Ceia de Natal', category: 'Alimentação', amount: 350.00, date: '2024-12-24' },
+  { id: 103, description: 'Presentes de Natal', category: 'Outros', amount: 480.00, date: '2024-12-20' },
+  { id: 104, description: 'Gasolina', category: 'Transporte', amount: 215.50, date: '2024-12-18' },
+  { id: 105, description: 'Restaurante', category: 'Alimentação', amount: 75.90, date: '2024-12-15' },
+
+  // Novembro 2024
+  { id: 201, description: 'Black Friday Shopping', category: 'Vestuário', amount: 299.99, date: '2024-11-29' },
+  { id: 202, description: 'Supermercado', category: 'Alimentação', amount: 132.45, date: '2024-11-25' },
+  { id: 203, description: 'Consulta médica', category: 'Saúde', amount: 180.00, date: '2024-11-20' },
+  { id: 204, description: 'Cinema', category: 'Lazer', amount: 52.00, date: '2024-11-15' },
+  { id: 205, description: 'Livros', category: 'Educação', amount: 89.90, date: '2024-11-10' },
+
+  // Outubro 2024
+  { id: 301, description: 'Festa de aniversário', category: 'Lazer', amount: 245.00, date: '2024-10-28' },
+  { id: 302, description: 'Roupas novas', category: 'Vestuário', amount: 167.50, date: '2024-10-22' },
+  { id: 303, description: 'Supermercado', category: 'Alimentação', amount: 145.20, date: '2024-10-18' },
+  { id: 304, description: 'Medicamentos', category: 'Saúde', amount: 95.30, date: '2024-10-12' },
+  { id: 305, description: 'Uber', category: 'Transporte', amount: 23.50, date: '2024-10-08' }
+];
+
 // Dados mock para assinaturas
 export const subscriptions: Subscription[] = [
   { id: 1, name: 'Netflix', category: 'Entretenimento', amount: 32.90, nextPayment: '2025-01-15', status: 'Ativa' },

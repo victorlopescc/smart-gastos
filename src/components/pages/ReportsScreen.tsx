@@ -4,8 +4,34 @@ import { IconDownload } from '@tabler/icons-react'
 import { useReports } from '../../hooks/useReports'
 
 export function ReportsScreen() {
-  const { selectedPeriod, setSelectedPeriod, getFilteredReports, exportToPDF } = useReports()
+  const {
+    selectedPeriod,
+    setSelectedPeriod,
+    getFilteredReports,
+    exportToPDF,
+    getIntegratedReportData
+  } = useReports()
+
   const filteredReports = getFilteredReports()
+  const integratedData = getIntegratedReportData()
+
+  // Função para obter cor da categoria (movida para antes do uso)
+  const getCategoryColor = (categoryName: string) => {
+    const colors: { [key: string]: string } = {
+      'Alimentação': '#FF6B6B',
+      'Transporte': '#4ECDC4',
+      'Moradia': '#45B7D1',
+      'Lazer': '#96CEB4',
+      'Saúde': '#FECA57',
+      'Educação': '#FF9FF3',
+      'Vestuário': '#54A0FF',
+      'Outros': '#5F27CD',
+      'Entretenimento': '#FF6B6B',
+      'Tecnologia': '#4ECDC4',
+      'Trabalho': '#45B7D1'
+    }
+    return colors[categoryName] || '#868E96'
+  }
 
   // Dados dinâmicos baseados no filtro selecionado
   const monthlyData = filteredReports.map((report) => ({
@@ -14,15 +40,14 @@ export function ReportsScreen() {
     receitas: report.budget
   })).reverse()
 
-  // Dados de categoria do período mais recente para comparação
-  const latestReport = filteredReports[0]
-
-  // Dados para gráfico de pizza (categorias atuais)
-  const categoryPieData = latestReport?.categories.filter(cat => cat.value > 0).map(category => ({
-    name: category.name,
-    value: category.value,
-    color: category.color
-  })) || []
+  // Usar dados integrados para categoria (incluindo assinaturas)
+  const categoryPieData = Object.entries(integratedData.currentMonthSummary.categoryBreakdown)
+    .filter(([, value]) => value > 0)
+    .map(([name, value]) => ({
+      name,
+      value,
+      color: getCategoryColor(name)
+    }))
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {

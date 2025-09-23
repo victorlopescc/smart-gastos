@@ -17,11 +17,20 @@ import { IconSearch, IconFilter, IconEdit, IconTrash } from '@tabler/icons-react
 import { useDashboard } from '../../hooks/useDashboard'
 import { useReports } from '../../hooks/useReports'
 import { useAlerts } from '../../hooks/useAlerts'
-import { categories as categoryColors } from '../../data/mockData'
+import { useAuth } from '../../hooks/useAuth'
+import { categories as categoryColors, recentExpenses, historicalExpenses } from '../../data/mockData'
 import { createAmountChangeHandler, parseCurrencyToNumber } from '../../utils/formatters'
 import type { Expense } from '../../types'
 
+// Extendendo o tipo Expense para incluir propriedades de identificação
+interface ExtendedExpense extends Expense {
+  isSubscription?: boolean
+  isHistorical?: boolean
+  isEditable?: boolean
+}
+
 export function ExpenseHistoryScreen() {
+  const { user } = useAuth()
   const { addedExpenses, editExpense, deleteExpense, getSubscriptionExpenses, monthlyData } = useDashboard()
   const { setDashboardData, setExpenses } = useReports()
   const { processExpenseAlerts } = useAlerts()
@@ -86,43 +95,50 @@ export function ExpenseHistoryScreen() {
     }
   }, [addedExpenses, monthlyData, processExpenseAlerts])
 
-  // Função para obter histórico completo (gastos manuais + assinaturas)
-  const getCompleteExpenseHistory = useMemo(() => {
+  // Função para obter histórico completo (gastos manuais + assinaturas + histórico)
+  const getCompleteExpenseHistory = useMemo((): ExtendedExpense[] => {
     const subscriptionExpenses = getSubscriptionExpenses()
-    const allExpenses = [...addedExpenses, ...subscriptionExpenses]
+
+    // Apenas incluir dados históricos se for a conta de teste
+    const historicalData = user?.email === 'teste@exemplo.com' ? [...historicalExpenses, ...recentExpenses] : []
+
+    // Combinar todos os gastos: adicionados pelo usuário + assinaturas + histórico (apenas para conta teste)
+    const allExpenses = [...addedExpenses, ...subscriptionExpenses, ...historicalData]
 
     // Adicionar flag para identificar origem (sem alterar visual)
     return allExpenses.map(expense => ({
       ...expense,
-      isSubscription: expense.id > 100000 // IDs de assinaturas são maiores que 100000
+      isSubscription: expense.id > 100000 && expense.description.includes('Assinatura'),
+      isHistorical: expense.id >= 101 && expense.id <= 305, // IDs históricos
+      isEditable: expense.id < 100000 || addedExpenses.some(e => e.id === expense.id) // Apenas gastos adicionados manualmente são editáveis
     }))
-  }, [addedExpenses, getSubscriptionExpenses])
+  }, [addedExpenses, getSubscriptionExpenses, user])
 
   // Atualizar filteredExpenses para usar histórico completo quando não há filtros específicos
-  const filteredExpenses = useMemo(() => {
+  const filteredExpenses = useMemo((): ExtendedExpense[] => {
     // Se há filtros específicos, usar apenas gastos manuais para edição/exclusão
     // Se não há filtros, mostrar histórico completo (incluindo assinaturas)
     const baseExpenses = (searchTerm || categoryFilter || startDate || endDate)
       ? addedExpenses || []
       : getCompleteExpenseHistory
 
-    let expenses: Expense[] = Array.isArray(baseExpenses) ? baseExpenses : []
+    let expenses: ExtendedExpense[] = Array.isArray(baseExpenses) ? baseExpenses : []
 
     // Filtro por termo de busca (descrição)
     if (searchTerm) {
-      expenses = expenses.filter((expense: Expense) =>
+      expenses = expenses.filter((expense: ExtendedExpense) =>
         expense.description.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
     // Filtro por categoria
     if (categoryFilter) {
-      expenses = expenses.filter((expense: Expense) => expense.category === categoryFilter)
+      expenses = expenses.filter((expense: ExtendedExpense) => expense.category === categoryFilter)
     }
 
     // Filtro por intervalo de datas
     if (startDate || endDate) {
-      expenses = expenses.filter((expense: Expense) => {
+      expenses = expenses.filter((expense: ExtendedExpense) => {
         const expenseDate = new Date(expense.date)
 
         if (startDate && endDate) {
@@ -142,7 +158,7 @@ export function ExpenseHistoryScreen() {
     }
 
     // Ordenar por data (mais recente primeiro)
-    return expenses.sort((a: Expense, b: Expense) =>
+    return expenses.sort((a: ExtendedExpense, b: ExtendedExpense) =>
       new Date(b.date).getTime() - new Date(a.date).getTime()
     )
   }, [addedExpenses, getCompleteExpenseHistory, searchTerm, categoryFilter, startDate, endDate])
@@ -207,7 +223,7 @@ export function ExpenseHistoryScreen() {
 
   const handleAmountChange = createAmountChangeHandler(setFormData)
 
-  const totalFilteredExpenses = filteredExpenses.reduce((sum: number, expense: Expense) => sum + expense.amount, 0)
+  const totalFilteredExpenses = filteredExpenses.reduce((sum: number, expense: ExtendedExpense) => sum + expense.amount, 0)
 
   return (
     <>
@@ -236,6 +252,14 @@ export function ExpenseHistoryScreen() {
                 onChange={setCategoryFilter}
                 clearable
                 leftSection={<IconFilter size={16} />}
+                searchable={false}
+                allowDeselect={true}
+                withCheckIcon={false}
+                comboboxProps={{
+                  transitionProps: { duration: 0 },
+                  shadow: 'md',
+                  withinPortal: false
+                }}
               />
 
               <TextInput
@@ -286,7 +310,7 @@ export function ExpenseHistoryScreen() {
               </Table.Thead>
               <Table.Tbody>
                 {filteredExpenses.length > 0 ? (
-                  filteredExpenses.map((expense: Expense) => (
+                  filteredExpenses.map((expense: ExtendedExpense) => (
                     <Table.Tr key={expense.id}>
                       <Table.Td>
                         {new Date(expense.date).toLocaleDateString('pt-BR')}
@@ -313,7 +337,7 @@ export function ExpenseHistoryScreen() {
                       <Table.Td>
                         <Group gap="xs">
                           {/* Só permitir edição/exclusão de gastos manuais, não de assinaturas */}
-                          {expense.id <= 100000 && (
+                          {expense.isEditable && (
                             <>
                               <ActionIcon
                                 size="sm"
@@ -333,9 +357,14 @@ export function ExpenseHistoryScreen() {
                               </ActionIcon>
                             </>
                           )}
-                          {expense.id > 100000 && (
+                          {expense.isSubscription && (
                             <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
                               Assinatura
+                            </Text>
+                          )}
+                          {expense.isHistorical && (
+                            <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
+                              Histórico
                             </Text>
                           )}
                         </Group>
@@ -385,6 +414,14 @@ export function ExpenseHistoryScreen() {
           onChange={(value) => setFormData(prev => ({ ...prev, category: value || '' }))}
           mb="md"
           required
+          searchable={false}
+          allowDeselect={false}
+          withCheckIcon={false}
+          comboboxProps={{
+            transitionProps: { duration: 0 },
+            shadow: 'md',
+            withinPortal: false
+          }}
         />
 
         <TextInput

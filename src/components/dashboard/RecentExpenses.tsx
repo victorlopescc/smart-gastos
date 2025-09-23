@@ -163,38 +163,47 @@ export function RecentExpenses() {
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {monthlyData.recentExpenses.map((expense) => (
-                <Table.Tr key={expense.id}>
-                  <Table.Td>{new Date(expense.date).toLocaleDateString('pt-BR')}</Table.Td>
-                  <Table.Td>{expense.description}</Table.Td>
-                  <Table.Td>
-                    <Badge variant="light" size="sm" color={getCategoryColor(expense.category)}>
-                      {expense.category}
-                    </Badge>
-                  </Table.Td>
-                  <Table.Td c="red">{formatCurrency(expense.amount)}</Table.Td>
-                  <Table.Td>
-                    <Group gap="xs">
-                      <ActionIcon
-                        size="sm"
-                        color="#0ca167"
-                        variant="subtle"
-                        onClick={() => handleOpenEditModal(expense)}
-                      >
-                        <IconEdit size={16} />
-                      </ActionIcon>
-                      <ActionIcon
-                        size="sm"
-                        color="red"
-                        variant="subtle"
-                        onClick={() => handleDeleteExpense(expense)}
-                      >
-                        <IconTrash size={16} />
-                      </ActionIcon>
-                    </Group>
-                  </Table.Td>
-                </Table.Tr>
-              ))}
+              {monthlyData.recentExpenses.map((expense) => {
+                // Verificar se é uma assinatura (ID > 100000 indica assinatura convertida)
+                const isSubscription = expense.id > 100000 && expense.description.includes('Assinatura')
+
+                return (
+                  <Table.Tr key={expense.id}>
+                    <Table.Td>{new Date(expense.date).toLocaleDateString('pt-BR')}</Table.Td>
+                    <Table.Td>{expense.description}</Table.Td>
+                    <Table.Td>
+                      <Badge variant="light" size="sm" color={getCategoryColor(expense.category)}>
+                        {expense.category}
+                      </Badge>
+                    </Table.Td>
+                    <Table.Td c="red">{formatCurrency(expense.amount)}</Table.Td>
+                    <Table.Td>
+                      {!isSubscription ? (
+                        <Group gap="xs">
+                          <ActionIcon
+                            size="sm"
+                            color="#0ca167"
+                            variant="subtle"
+                            onClick={() => handleOpenEditModal(expense)}
+                          >
+                            <IconEdit size={16} />
+                          </ActionIcon>
+                          <ActionIcon
+                            size="sm"
+                            color="red"
+                            variant="subtle"
+                            onClick={() => handleDeleteExpense(expense)}
+                          >
+                            <IconTrash size={16} />
+                          </ActionIcon>
+                        </Group>
+                      ) : (
+                        <Text size="xs" c="dimmed">Assinatura</Text>
+                      )}
+                    </Table.Td>
+                  </Table.Tr>
+                )
+              })}
               {monthlyData.recentExpenses.length === 0 && (
                 <Table.Tr>
                   <Table.Td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
@@ -243,6 +252,14 @@ export function RecentExpenses() {
           onChange={handleCategoryChange}
           mb="md"
           required
+          searchable={false}
+          allowDeselect={false}
+          withCheckIcon={false}
+          comboboxProps={{
+            transitionProps: { duration: 0 },
+            shadow: 'md',
+            withinPortal: false
+          }}
         />
 
         <TextInput
@@ -299,6 +316,14 @@ export function RecentExpenses() {
           onChange={handleCategoryChange}
           mb="md"
           required
+          searchable={false}
+          allowDeselect={false}
+          withCheckIcon={false}
+          comboboxProps={{
+            transitionProps: { duration: 0 },
+            shadow: 'md',
+            withinPortal: false
+          }}
         />
 
         <TextInput

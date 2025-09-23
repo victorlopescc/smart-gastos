@@ -1,6 +1,7 @@
-import { createContext, useState, type ReactNode } from 'react'
+import { createContext, useState, useEffect, type ReactNode } from 'react'
 import type { Subscription } from '../types'
 import { subscriptions as initialSubscriptions } from '../data/mockData'
+import { useAuth } from '../hooks/useAuth'
 
 interface SubscriptionsContextType {
   subscriptions: Subscription[]
@@ -12,7 +13,43 @@ interface SubscriptionsContextType {
 const SubscriptionsContext = createContext<SubscriptionsContextType | undefined>(undefined)
 
 export function SubscriptionsProvider({ children }: { children: ReactNode }) {
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>(initialSubscriptions)
+  const { user } = useAuth()
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+
+  // Inicializar assinaturas baseado no usuário
+  useEffect(() => {
+    if (user) {
+      const userSubscriptionsKey = `subscriptions_${user.id}`
+      const storedSubscriptions = localStorage.getItem(userSubscriptionsKey)
+
+      if (storedSubscriptions) {
+        // Usuário existente - carregar dados salvos
+        try {
+          setSubscriptions(JSON.parse(storedSubscriptions))
+        } catch {
+          setSubscriptions([])
+        }
+      } else {
+        // Novo usuário - verificar se é a conta de teste
+        if (user.email === 'teste@exemplo.com') {
+          setSubscriptions(initialSubscriptions)
+          localStorage.setItem(userSubscriptionsKey, JSON.stringify(initialSubscriptions))
+        } else {
+          // Conta nova criada - iniciar sem assinaturas
+          setSubscriptions([])
+          localStorage.setItem(userSubscriptionsKey, JSON.stringify([]))
+        }
+      }
+    }
+  }, [user])
+
+  // Salvar assinaturas no localStorage quando mudarem
+  useEffect(() => {
+    if (user && subscriptions.length >= 0) {
+      const userSubscriptionsKey = `subscriptions_${user.id}`
+      localStorage.setItem(userSubscriptionsKey, JSON.stringify(subscriptions))
+    }
+  }, [subscriptions, user])
 
   const addSubscription = (subscriptionData: Omit<Subscription, 'id'>) => {
     const newSubscription: Subscription = {

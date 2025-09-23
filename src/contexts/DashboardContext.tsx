@@ -95,27 +95,54 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
 
   // Inicialização do monthlyData considerando gastos adicionados E assinaturas
   const [monthlyData, setMonthlyData] = useState<MonthlyData>(() => {
-    const currentMonth = new Date().getMonth()
-    const currentYear = new Date().getFullYear()
-
-    const currentMonthAddedExpenses = addedExpenses.filter(expense => {
-      const date = new Date(expense.date)
-      return date.getMonth() === currentMonth && date.getFullYear() === currentYear
-    })
-
-    // Combina gastos existentes + adicionados + assinaturas
-    const allCurrentMonthExpenses = [...currentMonthAddedExpenses, ...currentMonthExpenses, ...subscriptionExpenses]
-    const totalSpentWithAll = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-
     return {
       budget: 5000,
-      spent: totalSpentWithAll,
-      categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
-      recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
-        new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
-      )
+      spent: 0,
+      categories: calculateCategoriesFromExpenses([]),
+      recentExpenses: []
     }
   })
+
+  // Effect para recalcular dados quando componente inicializa e quando assinaturas/gastos mudam
+  useEffect(() => {
+    // Usar setTimeout para evitar setState durante render
+    const timer = setTimeout(() => {
+      const currentMonth = new Date().getMonth()
+      const currentYear = new Date().getFullYear()
+
+      const currentMonthAddedExpenses = addedExpenses.filter(expense => {
+        const date = new Date(expense.date)
+        return date.getMonth() === currentMonth && date.getFullYear() === currentYear
+      })
+
+      // Combina gastos existentes + adicionados + assinaturas
+      const allCurrentMonthExpenses = [...currentMonthAddedExpenses, ...currentMonthExpenses, ...subscriptionExpenses]
+      const totalSpentWithAll = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+
+      const newMonthlyData = {
+        budget: monthlyData.budget,
+        spent: totalSpentWithAll,
+        categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
+        recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
+          new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
+        )
+      }
+
+      setMonthlyData(newMonthlyData)
+
+      // Processar alertas automaticamente em próximo tick
+      setTimeout(() => {
+        if (alertHandlers.processBudgetAlerts) {
+          alertHandlers.processBudgetAlerts(newMonthlyData)
+        }
+        if (alertHandlers.processExpenseAlerts) {
+          alertHandlers.processExpenseAlerts(allCurrentMonthExpenses, newMonthlyData)
+        }
+      }, 0)
+    }, 0)
+
+    return () => clearTimeout(timer)
+  }, [addedExpenses, subscriptionExpenses, currentMonthExpenses])
 
   // Função utilitária para recalcular dados mensais incluindo assinaturas
   const recalculateMonthlyData = useCallback((updatedAddedExpenses: Expense[], budget?: number) => {
@@ -127,8 +154,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
       return date.getMonth() === currentMonth && date.getFullYear() === currentYear
     })
 
+    // Obter assinaturas atualizadas
+    const currentSubscriptionExpenses = getSubscriptionExpenses()
+
     // Inclui assinaturas nos cálculos automaticamente
-    const allCurrentMonthExpenses = [...currentMonthAddedExpenses, ...currentMonthExpenses, ...subscriptionExpenses]
+    const allCurrentMonthExpenses = [...currentMonthAddedExpenses, ...currentMonthExpenses, ...currentSubscriptionExpenses]
     const newSpent = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
 
     const newMonthlyData = {
@@ -149,7 +179,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     if (alertHandlers.processExpenseAlerts) {
       alertHandlers.processExpenseAlerts(allCurrentMonthExpenses, newMonthlyData)
     }
-  }, [currentMonthExpenses, subscriptionExpenses, monthlyData.budget, alertHandlers])
+  }, [currentMonthExpenses, getSubscriptionExpenses, monthlyData.budget, alertHandlers])
 
   // Recalcula quando as assinaturas mudam
   useEffect(() => {

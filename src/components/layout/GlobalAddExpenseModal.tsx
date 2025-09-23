@@ -89,6 +89,14 @@ export function GlobalAddExpenseModal({ opened, onClose }: GlobalAddExpenseModal
         onChange={(value) => setFormData(prev => ({ ...prev, category: value || '' }))}
         mb="md"
         required
+        searchable={false}
+        allowDeselect={false}
+        withCheckIcon={false}
+        comboboxProps={{
+          transitionProps: { duration: 0 },
+          shadow: 'md',
+          withinPortal: false
+        }}
       />
 
       <TextInput

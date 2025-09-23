@@ -1,6 +1,7 @@
-import { createContext, useState, useCallback, type ReactNode } from 'react'
+import { createContext, useState, useCallback, useEffect, type ReactNode } from 'react'
 import type { Subscription, ReportData, MonthlyData, Expense } from '../types'
 import { monthlyReports } from '../data/mockData'
+import { useAuth } from '../hooks/useAuth'
 import jsPDF from 'jspdf'
 
 export type PeriodFilter = '3m' | '6m' | '1y'
@@ -26,6 +27,7 @@ interface ReportsContextType {
   // Novas integrações com Dashboard e Gastos
   setDashboardData: (monthlyData: MonthlyData) => void
   setExpenses: (expenses: Expense[]) => void
+  setAddedExpenses: (expenses: Expense[]) => void
   getIntegratedReportData: () => {
     currentMonthSummary: {
       budget: number
@@ -47,41 +49,73 @@ interface ReportsContextType {
 const ReportsContext = createContext<ReportsContextType | undefined>(undefined)
 
 export function ReportsProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth()
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('3m')
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+  const [userReports, setUserReports] = useState<typeof monthlyReports>([])
 
   // Estados para integração completa (invisível ao usuário)
   const [dashboardData, setDashboardData] = useState<MonthlyData | null>(null)
   const [expenses, setExpenses] = useState<Expense[]>([])
+  const [addedExpenses, setAddedExpenses] = useState<Expense[]>([])
 
   // Handlers para alertas (integração invisível)
   const [alertHandlers, setAlertHandlers] = useState<{
     processReportAlerts?: (reportData: ReportData) => void
   }>({})
 
-  const getFilteredReports = () => {
-    const months = {
-      '3m': 3,
-      '6m': 6,
-      '1y': 12
-    }
+  // Função para converter assinaturas em gastos mensais (local)
+  const getSubscriptionExpenses = useCallback((): Expense[] => {
+    const currentMonth = new Date().getMonth()
+    const currentYear = new Date().getFullYear()
 
-    const reports = monthlyReports.slice(0, months[selectedPeriod])
+    return subscriptions
+      .filter(sub => sub.status === 'Ativa')
+      .map(sub => ({
+        id: sub.id + 100000,
+        description: `Assinatura ${sub.name}`,
+        category: sub.category,
+        amount: sub.amount,
+        date: new Date(currentYear, currentMonth, 1).toISOString().split('T')[0]
+      }))
+  }, [subscriptions])
 
-    // Processar alertas automaticamente quando dados do relatório mudam
-    if (alertHandlers.processReportAlerts) {
-      const reportData = {
-        trends: reports,
-        period: selectedPeriod,
-        subscriptionAnalytics: getSubscriptionAnalytics()
+  // Inicializar relatórios baseado no usuário
+  useEffect(() => {
+    if (user) {
+      const userReportsKey = `reports_${user.id}`
+      const storedReports = localStorage.getItem(userReportsKey)
+
+      if (storedReports) {
+        // Usuário existente - carregar dados salvos
+        try {
+          setUserReports(JSON.parse(storedReports))
+        } catch {
+          setUserReports([])
+        }
+      } else {
+        // Novo usuário - verificar se é a conta de teste
+        if (user.email === 'teste@exemplo.com') {
+          setUserReports(monthlyReports)
+          localStorage.setItem(userReportsKey, JSON.stringify(monthlyReports))
+        } else {
+          // Conta nova criada - iniciar sem relatórios
+          setUserReports([])
+          localStorage.setItem(userReportsKey, JSON.stringify([]))
+        }
       }
-      alertHandlers.processReportAlerts(reportData)
     }
+  }, [user])
 
-    return reports
-  }
+  // Salvar relatórios no localStorage quando mudarem
+  useEffect(() => {
+    if (user && userReports.length >= 0) {
+      const userReportsKey = `reports_${user.id}`
+      localStorage.setItem(userReportsKey, JSON.stringify(userReports))
+    }
+  }, [userReports, user])
 
-  // Análise automática de assinaturas para relatórios
+  // Análise automática de assinaturas para relatórios (movido para antes de getFilteredReports)
   const getSubscriptionAnalytics = useCallback(() => {
     const activeSubscriptions = subscriptions.filter(sub => sub.status === 'Ativa')
     const totalMonthly = activeSubscriptions.reduce((sum, sub) => sum + sub.amount, 0)
@@ -102,6 +136,47 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
       annualProjection
     }
   }, [subscriptions])
+
+  // Função para obter relatórios filtrados (considerando dados do usuário)
+  const getFilteredReports = useCallback(() => {
+    const months = {
+      '3m': 3,
+      '6m': 6,
+      '1y': 12
+    }
+
+    const reports = userReports.slice(0, months[selectedPeriod])
+
+    // Remover processamento de alertas para evitar setState durante render
+    // Os alertas serão processados apenas quando explicitamente solicitado
+    return reports
+  }, [userReports, selectedPeriod])
+
+  // Função separada para processar alertas (chamada apenas quando necessário)
+  const processReportAlertsIfNeeded = useCallback(() => {
+    if (alertHandlers.processReportAlerts) {
+      const reports = userReports.slice(0, {
+        '3m': 3,
+        '6m': 6,
+        '1y': 12
+      }[selectedPeriod])
+
+      const reportData = {
+        trends: reports,
+        period: selectedPeriod,
+        subscriptionAnalytics: getSubscriptionAnalytics()
+      }
+      alertHandlers.processReportAlerts(reportData)
+    }
+  }, [userReports, selectedPeriod, alertHandlers, getSubscriptionAnalytics])
+
+  // Processar alertas em useEffect para evitar setState durante render
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      processReportAlertsIfNeeded()
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [processReportAlertsIfNeeded])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -307,30 +382,53 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
     doc.save(`relatorio-integrado-${selectedPeriod}-${currentDate.replace(/\//g, '-')}.pdf`)
   }
 
-  // Nova função para análise integrada de dados
+  // Sincronizar gastos с reports (corrigido)
+  useEffect(() => {
+    // Combinar gastos manuais com gastos de assinaturas para relatórios completos
+    const subscriptionExpenses = getSubscriptionExpenses()
+    const allExpenses = [...addedExpenses, ...subscriptionExpenses]
+    setExpenses(allExpenses)
+  }, [addedExpenses, getSubscriptionExpenses, subscriptions]) // Adicionando subscriptions às dependências
+
+  // Nova função para análise integrada de dados (corrigida)
   const getIntegratedReportData = useCallback(() => {
     const subscriptionAnalytics = getSubscriptionAnalytics()
     const currentMonth = new Date().getMonth()
     const currentYear = new Date().getFullYear()
 
-    // Filtrar gastos do mês atual
-    const currentMonthExpenses = expenses.filter(expense => {
+    // Filtrar gastos do mês atual incluindo TODOS os tipos de gastos
+    const currentMonthExpenses = expenses.filter((expense: Expense) => {
       const expenseDate = new Date(expense.date)
       return expenseDate.getMonth() === currentMonth &&
              expenseDate.getFullYear() === currentYear
     })
+
+    // Incluir também gastos adicionados que podem não estar em expenses ainda
+    const allCurrentMonthExpenses = [...currentMonthExpenses, ...addedExpenses.filter((expense: Expense) => {
+      const expenseDate = new Date(expense.date)
+      return expenseDate.getMonth() === currentMonth &&
+             expenseDate.getFullYear() === currentYear
+    })]
+
+    // Remover duplicatas baseado no ID
+    const uniqueExpenses = allCurrentMonthExpenses.reduce((acc: Expense[], expense: Expense) => {
+      if (!acc.find((e: Expense) => e.id === expense.id)) {
+        acc.push(expense)
+      }
+      return acc
+    }, [] as Expense[])
 
     // Resumo do mês atual integrando todas as fontes
     const currentMonthSummary = {
       budget: dashboardData?.budget || 0,
       spent: dashboardData?.spent || 0,
       saved: Math.max(0, (dashboardData?.budget || 0) - (dashboardData?.spent || 0)),
-      categoryBreakdown: dashboardData?.categories.reduce((acc, cat) => {
+      categoryBreakdown: dashboardData?.categories.reduce((acc: { [key: string]: number }, cat: { name: string; value: number }) => {
         acc[cat.name] = cat.value
         return acc
-      }, {} as { [key: string]: number }) || {},
+      }, {}) || {},
       subscriptionsCost: subscriptionAnalytics.totalMonthly,
-      expensesCount: currentMonthExpenses.length
+      expensesCount: uniqueExpenses.length
     }
 
     // Calcular tendências baseadas nos relatórios históricos
@@ -385,7 +483,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
       trends,
       insights
     }
-  }, [subscriptions, dashboardData, expenses, getSubscriptionAnalytics, getFilteredReports])
+  }, [subscriptions, dashboardData, expenses, addedExpenses, getSubscriptionAnalytics, getFilteredReports])
 
   const setAlertHandlersFunc = useCallback((handlers: {
     processReportAlerts: (reportData: ReportData) => void
@@ -405,6 +503,7 @@ export function ReportsProvider({ children }: { children: ReactNode }) {
         setAlertHandlers: setAlertHandlersFunc,
         setDashboardData,
         setExpenses,
+        setAddedExpenses,
         getIntegratedReportData
       }}
     >
