@@ -82,16 +82,3 @@ export const monthlyData: MonthlyData = {
   categories: categories,
   recentExpenses: recentExpenses.slice(0, 5) // Apenas os 5 mais recentes para o dashboard
 };
-
-// Dados do usuário
-export const userData = {
-  name: 'João Silva',
-  email: 'joao.silva@email.com',
-  avatar: null,
-  memberSince: '2024-03-15',
-  preferences: {
-    currency: 'BRL',
-    notifications: false,
-    darkMode: false
-  }
-};

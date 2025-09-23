@@ -130,18 +130,6 @@ export function LoginScreen({ onSwitchToRegister }: LoginScreenProps) {
               Criar conta
             </Button>
           </Group>
-
-          <Paper p="md" bg="gray.0" radius="md" mt="xl">
-            <Text size="sm" c="dimmed" ta="center" mb="xs">
-              Para testar, você pode usar:
-            </Text>
-            <Text size="xs" ta="center">
-              <strong>Email:</strong> teste@exemplo.com
-            </Text>
-            <Text size="xs" ta="center">
-              <strong>Senha:</strong> 123456
-            </Text>
-          </Paper>
         </Paper>
       </Box>
     </Container>
