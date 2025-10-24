@@ -6,5 +6,24 @@ export const useSubscriptions = () => {
   if (context === undefined) {
     throw new Error('useSubscriptions must be used within a SubscriptionsProvider')
   }
-  return context
+
+  const {
+    subscriptions,
+    addSubscription,
+    updateSubscription,
+    toggleSubscriptionStatus,
+    deleteSubscription,
+    isLoading,
+    error
+  } = context
+
+  return {
+    subscriptions,
+    addSubscription,
+    updateSubscription,
+    toggleSubscriptionStatus,
+    deleteSubscription,
+    isLoading,
+    error
+  }
 }

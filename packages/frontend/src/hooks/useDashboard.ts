@@ -17,7 +17,9 @@ export function useDashboard() {
     getSubscriptionExpenses,
     getTotalSubscriptionCost,
     setSubscriptions,
-    setAlertHandlers
+    setAlertHandlers,
+    isLoading,
+    error
   } = context
 
   return {
@@ -31,6 +33,8 @@ export function useDashboard() {
     getSubscriptionExpenses,
     getTotalSubscriptionCost,
     setSubscriptions,
-    setAlertHandlers
+    setAlertHandlers,
+    isLoading,
+    error
   }
 }

@@ -1,84 +1,120 @@
-import { createContext, useState, useEffect, type ReactNode } from 'react'
+import { createContext, useState, useEffect, useCallback, type ReactNode } from 'react'
 import type { Subscription } from '../types'
-import { subscriptions as initialSubscriptions } from '../data/mockData.ts'
-import { useAuth } from '../hooks/useAuth.ts'
+import { apiService, converters } from '../services/apiService'
 
 interface SubscriptionsContextType {
   subscriptions: Subscription[]
   addSubscription: (subscription: Omit<Subscription, 'id'>) => void
   updateSubscription: (id: number, subscription: Partial<Subscription>) => void
   toggleSubscriptionStatus: (id: number) => void
+  deleteSubscription: (id: number) => void
+  isLoading: boolean
+  error: string | null
 }
 
 const SubscriptionsContext = createContext<SubscriptionsContextType | undefined>(undefined)
 
 export function SubscriptionsProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  // Inicializar assinaturas baseado no usuário
-  useEffect(() => {
-    if (user) {
-      const userSubscriptionsKey = `subscriptions_${user.id}`
-      const storedSubscriptions = localStorage.getItem(userSubscriptionsKey)
+  // Carregar assinaturas do backend
+  const loadSubscriptions = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
 
-      if (storedSubscriptions) {
-        // Usuário existente - carregar dados salvos
-        try {
-          setSubscriptions(JSON.parse(storedSubscriptions))
-        } catch {
-          setSubscriptions([])
-        }
+      const response = await apiService.getAllSubscriptions()
+
+      if (response.success && response.data) {
+        const frontendSubscriptions = response.data.map(converters.backendToFrontendSubscription)
+        setSubscriptions(frontendSubscriptions)
       } else {
-        // Novo usuário - verificar se é a conta de teste
-        if (user.email === 'teste@exemplo.com') {
-          setSubscriptions(initialSubscriptions)
-          localStorage.setItem(userSubscriptionsKey, JSON.stringify(initialSubscriptions))
-        } else {
-          // Conta nova criada - iniciar sem assinaturas
-          setSubscriptions([])
-          localStorage.setItem(userSubscriptionsKey, JSON.stringify([]))
-        }
+        setError(response.error || 'Erro ao carregar assinaturas')
       }
+    } catch (err) {
+      setError('Erro de conexão com o servidor')
+      console.error('Erro ao carregar assinaturas:', err)
+    } finally {
+      setIsLoading(false)
     }
-  }, [user])
+  }, [])
 
-  // Salvar assinaturas no localStorage quando mudarem
+  // Carregar assinaturas quando o componente monta
   useEffect(() => {
-    if (user && subscriptions.length >= 0) {
-      const userSubscriptionsKey = `subscriptions_${user.id}`
-      localStorage.setItem(userSubscriptionsKey, JSON.stringify(subscriptions))
+    loadSubscriptions()
+  }, [loadSubscriptions])
+
+  // Adicionar nova assinatura
+  const addSubscription = useCallback(async (subscriptionData: Omit<Subscription, 'id'>) => {
+    try {
+      setIsLoading(true)
+      const backendSubscription = converters.frontendToBackendSubscription(subscriptionData)
+      const response = await apiService.addSubscription(backendSubscription)
+
+      if (response.success) {
+        // Recarregar lista de assinaturas
+        await loadSubscriptions()
+      } else {
+        setError(response.error || 'Erro ao adicionar assinatura')
+      }
+    } catch (err) {
+      setError('Erro de conexão ao adicionar assinatura')
+      console.error('Erro ao adicionar assinatura:', err)
+    } finally {
+      setIsLoading(false)
     }
-  }, [subscriptions, user])
+  }, [loadSubscriptions])
 
-  const addSubscription = (subscriptionData: Omit<Subscription, 'id'>) => {
-    const newSubscription: Subscription = {
-      ...subscriptionData,
-      id: Date.now()
+  // Atualizar assinatura
+  const updateSubscription = useCallback(async (id: number, updates: Partial<Subscription>) => {
+    try {
+      setIsLoading(true)
+      const response = await apiService.updateSubscription(id.toString(), updates)
+
+      if (response.success) {
+        // Recarregar lista de assinaturas
+        await loadSubscriptions()
+      } else {
+        setError(response.error || 'Erro ao atualizar assinatura')
+      }
+    } catch (err) {
+      setError('Erro de conexão ao atualizar assinatura')
+      console.error('Erro ao atualizar assinatura:', err)
+    } finally {
+      setIsLoading(false)
     }
-    setSubscriptions(prev => [newSubscription, ...prev])
-  }
+  }, [loadSubscriptions])
 
-  const updateSubscription = (id: number, updatedData: Partial<Subscription>) => {
-    setSubscriptions(prev =>
-      prev.map(sub =>
-        sub.id === id ? { ...sub, ...updatedData } : sub
-      )
-    )
-  }
+  // Alternar status da assinatura (Ativa/Cancelada)
+  const toggleSubscriptionStatus = useCallback(async (id: number) => {
+    const subscription = subscriptions.find(sub => sub.id === id)
+    if (!subscription) return
 
-  const toggleSubscriptionStatus = (id: number) => {
-    setSubscriptions(prev =>
-      prev.map(sub =>
-        sub.id === id
-          ? {
-              ...sub,
-              status: sub.status === 'Ativa' ? 'Cancelada' : 'Ativa'
-            }
-          : sub
-      )
-    )
-  }
+    const newStatus = subscription.status === 'Ativa' ? 'Cancelada' : 'Ativa'
+    await updateSubscription(id, { status: newStatus })
+  }, [subscriptions, updateSubscription])
+
+  // Deletar assinatura
+  const deleteSubscription = useCallback(async (id: number) => {
+    try {
+      setIsLoading(true)
+      const response = await apiService.deleteSubscription(id.toString())
+
+      if (response.success) {
+        // Recarregar lista de assinaturas
+        await loadSubscriptions()
+      } else {
+        setError(response.error || 'Erro ao deletar assinatura')
+      }
+    } catch (err) {
+      setError('Erro de conexão ao deletar assinatura')
+      console.error('Erro ao deletar assinatura:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [loadSubscriptions])
 
   return (
     <SubscriptionsContext.Provider
@@ -86,7 +122,10 @@ export function SubscriptionsProvider({ children }: { children: ReactNode }) {
         subscriptions,
         addSubscription,
         updateSubscription,
-        toggleSubscriptionStatus
+        toggleSubscriptionStatus,
+        deleteSubscription,
+        isLoading,
+        error
       }}
     >
       {children}

@@ -1,6 +1,6 @@
 import { createContext, useState, useCallback, useMemo, useEffect, type ReactNode } from 'react'
 import type { MonthlyData, Expense, Category, Subscription } from '../types'
-import { categories as initialCategories, recentExpenses as initialExpenses } from '../data/mockData.ts'
+import { apiService, converters } from '../services/apiService'
 
 interface DashboardContextType {
   monthlyData: MonthlyData
@@ -19,13 +19,17 @@ interface DashboardContextType {
     processBudgetAlerts: (monthlyData: MonthlyData) => void
     processExpenseAlerts: (expenses: Expense[], monthlyData: MonthlyData) => void
   }) => void
+  // Estados de carregamento
+  isLoading: boolean
+  error: string | null
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined)
 
 export function DashboardProvider({ children }: { children: ReactNode }) {
-  // Estado interno para assinaturas (integração invisível)
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>([])
+  // Estados de controle
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   // Handlers para alertas (integração invisível)
   const [alertHandlers, setAlertHandlers] = useState<{
@@ -33,209 +37,178 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     processExpenseAlerts?: (expenses: Expense[], monthlyData: MonthlyData) => void
   }>({})
 
+  // Estado separado para os gastos adicionados pelo usuário (mantido para compatibilidade)
+  const [addedExpenses, setAddedExpenses] = useState<Expense[]>([])
+
+  // Estado principal dos dados do dashboard
+  const [monthlyData, setMonthlyData] = useState<MonthlyData>({
+    budget: 0,
+    spent: 0,
+    categories: [],
+    recentExpenses: []
+  })
+
   const getCurrentMonth = () => {
     const now = new Date()
     return now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
       .replace(/^\w/, (c) => c.toUpperCase())
   }
 
-  const getCurrentMonthExpenses = () => {
-    const currentMonth = new Date().getMonth()
-    const currentYear = new Date().getFullYear()
+  // Função para carregar dados do backend
+  const loadDashboardData = useCallback(async () => {
+    try {
+      setIsLoading(true)
+      setError(null)
 
-    return initialExpenses.filter(expense => {
-      const expenseDate = new Date(expense.date)
-      return expenseDate.getMonth() === currentMonth &&
-             expenseDate.getFullYear() === currentYear
-    })
-  }
+      const currentMonth = converters.getCurrentMonthString()
+      const response = await apiService.getDashboardData(currentMonth)
 
-  // Função para converter assinaturas em gastos mensais
-  const getSubscriptionExpenses = useCallback((): Expense[] => {
-    const currentMonth = new Date().getMonth()
-    const currentYear = new Date().getFullYear()
+      if (response.success && response.data) {
+        const data = response.data
 
-    return subscriptions
-      .filter(sub => sub.status === 'Ativa')
-      .map(sub => ({
-        id: sub.id + 100000, // ID único para evitar conflitos
-        description: `Assinatura ${sub.name}`,
-        category: sub.category,
-        amount: sub.amount,
-        date: new Date(currentYear, currentMonth, 1).toISOString().split('T')[0]
-      }))
-  }, [subscriptions])
+        // Converter dados do backend para o formato do frontend
+        const frontendExpenses = data.expenses.map(converters.backendToFrontendExpense)
+        const frontendCategories = converters.backendToFrontendCategories(data.categoryChart)
+        const frontendRecentExpenses = data.recentExpenses.map(converters.backendToFrontendExpense)
 
-  // Função para obter custo total das assinaturas
-  const getTotalSubscriptionCost = useCallback((): number => {
-    return subscriptions
-      .filter(sub => sub.status === 'Ativa')
-      .reduce((total, sub) => total + sub.amount, 0)
-  }, [subscriptions])
+        setMonthlyData({
+          budget: data.budget?.totalBudget || 0,
+          spent: data.totalSpent,
+          categories: frontendCategories,
+          recentExpenses: frontendRecentExpenses
+        })
 
-  const calculateCategoriesFromExpenses = (expenses: Expense[]): Category[] => {
-    const categoryTotals = new Map<string, number>()
-
-    expenses.forEach(expense => {
-      const current = categoryTotals.get(expense.category) || 0
-      categoryTotals.set(expense.category, current + expense.amount)
-    })
-
-    return initialCategories.map(category => ({
-      ...category,
-      value: categoryTotals.get(category.name) || 0
-    }))
-  }
-
-  const currentMonthExpenses = useMemo(() => getCurrentMonthExpenses() || [], [])
-  const subscriptionExpenses = useMemo(() => getSubscriptionExpenses(), [getSubscriptionExpenses])
-
-  // Estado separado para os gastos adicionados pelo usuário
-  const [addedExpenses, setAddedExpenses] = useState<Expense[]>([])
-
-  // Inicialização do monthlyData considerando gastos adicionados E assinaturas
-  const [monthlyData, setMonthlyData] = useState<MonthlyData>(() => {
-    return {
-      budget: 5000,
-      spent: 0,
-      categories: calculateCategoriesFromExpenses([]),
-      recentExpenses: []
+        // Limpar addedExpenses pois agora usamos o backend
+        setAddedExpenses([])
+      } else {
+        setError(response.error || 'Erro ao carregar dados do dashboard')
+      }
+    } catch (err) {
+      setError('Erro de conexão com o servidor')
+      console.error('Erro ao carregar dashboard:', err)
+    } finally {
+      setIsLoading(false)
     }
-  })
+  }, [])
 
-  // Effect para recalcular dados quando componente inicializa e quando assinaturas/gastos mudam
+  // Carregar dados quando o componente monta
   useEffect(() => {
-    // Usar setTimeout para evitar setState durante render
-    const timer = setTimeout(() => {
-      const currentMonth = new Date().getMonth()
-      const currentYear = new Date().getFullYear()
+    loadDashboardData()
+  }, [loadDashboardData])
 
-      const currentMonthAddedExpenses = addedExpenses.filter(expense => {
-        const date = new Date(expense.date)
-        return date.getMonth() === currentMonth && date.getFullYear() === currentYear
-      })
+  // Atualizar orçamento
+  const updateBudget = useCallback(async (newBudget: number) => {
+    if (newBudget <= 0) return
 
-      // Combina gastos existentes + adicionados + assinaturas
-      const allCurrentMonthExpenses = [...currentMonthAddedExpenses, ...currentMonthExpenses, ...subscriptionExpenses]
-      const totalSpentWithAll = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+    try {
+      setIsLoading(true)
+      const currentMonth = converters.getCurrentMonthString()
+      const response = await apiService.setBudget(currentMonth, newBudget)
 
-      const newMonthlyData = {
-        budget: monthlyData.budget,
-        spent: totalSpentWithAll,
-        categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
-        recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
-          new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
-        )
+      if (response.success) {
+        // Recarregar dados do dashboard
+        await loadDashboardData()
+      } else {
+        setError(response.error || 'Erro ao atualizar orçamento')
       }
-
-      setMonthlyData(newMonthlyData)
-
-      // Processar alertas automaticamente em próximo tick
-      setTimeout(() => {
-        if (alertHandlers.processBudgetAlerts) {
-          alertHandlers.processBudgetAlerts(newMonthlyData)
-        }
-        if (alertHandlers.processExpenseAlerts) {
-          alertHandlers.processExpenseAlerts(allCurrentMonthExpenses, newMonthlyData)
-        }
-      }, 0)
-    }, 0)
-
-    return () => clearTimeout(timer)
-  }, [addedExpenses, subscriptionExpenses, currentMonthExpenses])
-
-  // Função utilitária para recalcular dados mensais incluindo assinaturas
-  const recalculateMonthlyData = useCallback((updatedAddedExpenses: Expense[], budget?: number) => {
-    const currentMonth = new Date().getMonth()
-    const currentYear = new Date().getFullYear()
-
-    const currentMonthAddedExpenses = updatedAddedExpenses.filter(expense => {
-      const date = new Date(expense.date)
-      return date.getMonth() === currentMonth && date.getFullYear() === currentYear
-    })
-
-    // Obter assinaturas atualizadas
-    const currentSubscriptionExpenses = getSubscriptionExpenses()
-
-    // Inclui assinaturas nos cálculos automaticamente
-    const allCurrentMonthExpenses = [...currentMonthAddedExpenses, ...currentMonthExpenses, ...currentSubscriptionExpenses]
-    const newSpent = allCurrentMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
-
-    const newMonthlyData = {
-      budget: budget ?? monthlyData.budget,
-      spent: newSpent,
-      categories: calculateCategoriesFromExpenses(allCurrentMonthExpenses),
-      recentExpenses: allCurrentMonthExpenses.slice(0, 5).sort((a, b) =>
-        new Date(b.date || '').getTime() - new Date(a.date || '').getTime()
-      )
+    } catch (err) {
+      setError('Erro de conexão ao atualizar orçamento')
+      console.error('Erro ao atualizar orçamento:', err)
     }
+  }, [loadDashboardData])
 
-    setMonthlyData(newMonthlyData)
+  // Função para carregar assinaturas do backend e converter para despesas (compatibilidade)
+  const getSubscriptionExpenses = useCallback(async (): Promise<Expense[]> => {
+    try {
+      const response = await apiService.getActiveSubscriptions()
+      if (response.success && response.data) {
+        const currentMonth = new Date().getMonth()
+        const currentYear = new Date().getFullYear()
 
-    // Processar alertas automaticamente (invisível ao usuário)
-    if (alertHandlers.processBudgetAlerts) {
-      alertHandlers.processBudgetAlerts(newMonthlyData)
-    }
-    if (alertHandlers.processExpenseAlerts) {
-      alertHandlers.processExpenseAlerts(allCurrentMonthExpenses, newMonthlyData)
-    }
-  }, [currentMonthExpenses, getSubscriptionExpenses, monthlyData.budget, alertHandlers])
-
-  // Recalcula quando as assinaturas mudam
-  useEffect(() => {
-    recalculateMonthlyData(addedExpenses)
-  }, [subscriptions, recalculateMonthlyData, addedExpenses])
-
-  const updateBudget = (newBudget: number) => {
-    if (newBudget > 0) {
-      const newMonthlyData = {
-        ...monthlyData,
-        budget: newBudget
+        return response.data.map(sub => ({
+          id: parseInt(sub.id, 10) + 100000, // ID único para evitar conflitos
+          description: `Assinatura ${sub.name}`,
+          category: sub.category,
+          amount: sub.amount,
+          date: new Date(currentYear, currentMonth, 1).toISOString().split('T')[0]
+        }))
       }
-      setMonthlyData(newMonthlyData)
-
-      // Processar alertas de orçamento automaticamente
-      if (alertHandlers.processBudgetAlerts) {
-        alertHandlers.processBudgetAlerts(newMonthlyData)
-      }
+    } catch (err) {
+      console.error('Erro ao carregar assinaturas:', err)
     }
-  }
+    return []
+  }, [])
 
-  const addExpense = (expenseData: Omit<Expense, 'id'>) => {
+  // Função para obter custo total das assinaturas (compatibilidade)
+  const getTotalSubscriptionCost = useCallback(async (): Promise<number> => {
+    try {
+      const response = await apiService.getTotalSubscriptionCost()
+      if (response.success && response.data) {
+        return response.data.totalCost
+      }
+    } catch (err) {
+      console.error('Erro ao calcular total de assinaturas:', err)
+    }
+    return 0
+  }, [])
+
+  // Função setSubscriptions para compatibilidade (agora apenas um stub)
+  const setSubscriptions = useCallback((subscriptions: Subscription[]) => {
+    // Esta função agora é apenas para compatibilidade
+    // As assinaturas são gerenciadas pelo SubscriptionsContext
+    console.log('Assinaturas agora são gerenciadas pelo SubscriptionsContext')
+  }, [])
+
+  // Adicionar despesa
+  const addExpense = useCallback(async (expenseData: Omit<Expense, 'id'>) => {
     if (!expenseData || !expenseData.description || !expenseData.category || !expenseData.amount) {
       return
     }
 
-    const newExpense: Expense = {
-      ...expenseData,
-      id: Date.now()
+    try {
+      setIsLoading(true)
+      const backendExpense = converters.frontendToBackendExpense(expenseData)
+      const response = await apiService.addExpense(backendExpense)
+
+      if (response.success) {
+        // Recarregar dados do dashboard
+        await loadDashboardData()
+      } else {
+        setError(response.error || 'Erro ao adicionar despesa')
+      }
+    } catch (err) {
+      setError('Erro de conexão ao adicionar despesa')
+      console.error('Erro ao adicionar despesa:', err)
+    } finally {
+      setIsLoading(false)
     }
+  }, [loadDashboardData])
 
-    setAddedExpenses(prev => {
-      const updatedExpenses = [newExpense, ...prev]
-      recalculateMonthlyData(updatedExpenses)
-      return updatedExpenses
-    })
-  }
+  // Editar despesa (mantida para compatibilidade, mas avisa que não está implementada no backend)
+  const editExpense = useCallback((id: number, expenseData: Omit<Expense, 'id'>) => {
+    console.warn('Edição de despesas ainda não implementada no backend')
+    // TODO: Implementar no backend
+  }, [])
 
-  const editExpense = (id: number, expenseData: Omit<Expense, 'id'>) => {
-    setAddedExpenses(prev => {
-      const updatedExpenses = prev.map(expense => expense.id === id
-        ? { ...expense, ...expenseData }
-        : expense
-      )
-      recalculateMonthlyData(updatedExpenses)
-      return updatedExpenses
-    })
-  }
+  // Deletar despesa
+  const deleteExpense = useCallback(async (id: number) => {
+    try {
+      setIsLoading(true)
+      const response = await apiService.deleteExpense(id.toString())
 
-  const deleteExpense = (id: number) => {
-    setAddedExpenses(prev => {
-      const updatedExpenses = prev.filter(expense => expense.id !== id)
-      recalculateMonthlyData(updatedExpenses)
-      return updatedExpenses
-    })
-  }
+      if (response.success) {
+        // Recarregar dados do dashboard
+        await loadDashboardData()
+      } else {
+        setError(response.error || 'Erro ao deletar despesa')
+      }
+    } catch (err) {
+      setError('Erro de conexão ao deletar despesa')
+      console.error('Erro ao deletar despesa:', err)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [loadDashboardData])
 
   const setAlertHandlersFunc = useCallback((handlers: {
     processBudgetAlerts: (monthlyData: MonthlyData) => void
@@ -243,6 +216,13 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   }) => {
     setAlertHandlers(handlers)
   }, [])
+
+  // Processar alertas quando os dados mudam
+  useEffect(() => {
+    if (!isLoading && alertHandlers.processBudgetAlerts) {
+      alertHandlers.processBudgetAlerts(monthlyData)
+    }
+  }, [monthlyData, isLoading, alertHandlers])
 
   return (
     <DashboardContext.Provider
@@ -257,7 +237,9 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         getSubscriptionExpenses,
         getTotalSubscriptionCost,
         setSubscriptions,
-        setAlertHandlers: setAlertHandlersFunc
+        setAlertHandlers: setAlertHandlersFunc,
+        isLoading,
+        error
       }}
     >
       {children}
