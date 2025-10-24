@@ -1,7 +1,10 @@
-import { Container, Title, Text, Card, Grid, Select, Button, Group } from '@mantine/core'
+import { Container, Title, Text, Card, Grid, Select, Button, Group, LoadingOverlay, Alert } from '@mantine/core'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts'
-import { IconDownload } from '@tabler/icons-react'
+import { IconDownload, IconInfoCircle } from '@tabler/icons-react'
 import { useReports } from '../../hooks/useReports.ts'
+import { useReportsApi } from '../../hooks/useReportsApi.ts'
+import { formatCurrency } from '../../utils/formatters.ts'
+import { useState, useMemo, useEffect } from 'react'
 
 export function ReportsScreen() {
   const {
@@ -12,66 +15,137 @@ export function ReportsScreen() {
     getIntegratedReportData
   } = useReports()
 
+  // Hook da API para dados reais do backend
+  const {
+    reportsData,
+    trendsData,
+    loading,
+    error,
+    loadReportsData,
+    loadTrends
+  } = useReportsApi()
+
+  const [currentPeriod, setCurrentPeriod] = useState<'3m' | '6m' | '1y'>('6m')
+
+  // Usar dados da API se disponíveis, senão fallback para dados mock
   const filteredReports = getFilteredReports()
   const integratedData = getIntegratedReportData()
 
-  // Função para obter cor da categoria (movida para antes do uso)
+  // Função para obter cor da categoria (mantida igual)
   const getCategoryColor = (categoryName: string) => {
     const colors: { [key: string]: string } = {
       'Alimentação': '#FF6B6B',
       'Transporte': '#4ECDC4',
       'Moradia': '#45B7D1',
+      'Casa': '#45B7D1', // Alias para Moradia
       'Lazer': '#96CEB4',
+      'Entretenimento': '#96CEB4', // Alias para Lazer
       'Saúde': '#FECA57',
       'Educação': '#FF9FF3',
       'Vestuário': '#54A0FF',
       'Outros': '#5F27CD',
-      'Entretenimento': '#FF6B6B',
       'Tecnologia': '#4ECDC4',
       'Trabalho': '#45B7D1'
     }
     return colors[categoryName] || '#868E96'
   }
 
-  // Dados dinâmicos baseados no filtro selecionado
-  const monthlyData = filteredReports.map((report) => ({
-    month: report.month.split(' ')[0].substring(0, 3),
-    gastos: report.spent,
-    receitas: report.budget
-  })).reverse()
+  // Carregar dados da API quando o período mudar
+  useEffect(() => {
+    const monthsMap = { '3m': 3, '6m': 6, '1y': 12 }
+    const months = monthsMap[currentPeriod]
 
-  // Usar dados integrados para categoria (incluindo assinaturas)
-  const categoryPieData = Object.entries(integratedData.currentMonthSummary.categoryBreakdown)
-    .filter(([, value]) => value > 0)
-    .map(([name, value]) => ({
-      name,
-      value,
-      color: getCategoryColor(name)
-    }))
+    if (reportsData) {
+      loadTrends({ months })
+    }
+  }, [currentPeriod, loadTrends, reportsData])
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value)
-  }
+  // Dados dinâmicos - usar API se disponível, senão mock
+  const monthlyData = useMemo(() => {
+    if (trendsData && trendsData.trends.length > 0) {
+      // Dados reais da API
+      return trendsData.trends.map(trend => ({
+        month: trend.month.split('-')[1], // Pegar apenas o mês
+        gastos: trend.totalAmount,
+        receitas: trend.totalAmount * 1.2 // Estimativa do orçamento baseada nos gastos
+      })).reverse()
+    } else {
+      // Fallback para dados mock
+      return filteredReports.map((report) => ({
+        month: report.month.split(' ')[0].substring(0, 3),
+        gastos: report.spent,
+        receitas: report.budget
+      })).reverse()
+    }
+  }, [trendsData, filteredReports])
 
-  const totalSaved = filteredReports.reduce((sum, report) => sum + report.saved, 0)
-  const averageSpending = filteredReports.length > 0
-    ? filteredReports.reduce((sum, report) => sum + report.spent, 0) / filteredReports.length
-    : 0
-  const maxSavings = filteredReports.length > 0
-    ? Math.max(...filteredReports.map(r => r.saved))
-    : 0
+  // Dados de categoria - usar API se disponível, senão mock
+  const categoryPieData = useMemo(() => {
+    if (reportsData && reportsData.categorySummary.length > 0) {
+      // Dados reais da API
+      return reportsData.categorySummary
+        .filter(cat => cat.amount > 0)
+        .map(cat => ({
+          name: cat.category,
+          value: cat.amount,
+          color: getCategoryColor(cat.category)
+        }))
+    } else {
+      // Fallback para dados mock
+      return Object.entries(integratedData.currentMonthSummary.categoryBreakdown)
+        .filter(([, value]) => value > 0)
+        .map(([name, value]) => ({
+          name,
+          value,
+          color: getCategoryColor(name)
+        }))
+    }
+  }, [reportsData, integratedData, getCategoryColor])
+
+  // Cálculos de estatísticas - usar API se disponível, senão mock
+  const { totalSaved, averageSpending, maxSavings } = useMemo(() => {
+    if (reportsData && trendsData) {
+      // Dados reais da API
+      const totalSpent = reportsData.summary.totalAmount
+      const avgSpending = reportsData.summary.averageAmount
+      const estimatedBudget = totalSpent * 1.2 // Estimativa
+      const saved = Math.max(0, estimatedBudget - totalSpent)
+
+      return {
+        totalSaved: saved,
+        averageSpending: avgSpending,
+        maxSavings: Math.max(...trendsData.trends.map(t => Math.max(0, (t.totalAmount * 1.2) - t.totalAmount)))
+      }
+    } else {
+      // Fallback para dados mock
+      const totalSavedMock = filteredReports.reduce((sum, report) => sum + report.saved, 0)
+      const averageSpendingMock = filteredReports.length > 0
+        ? filteredReports.reduce((sum, report) => sum + report.spent, 0) / filteredReports.length
+        : 0
+      const maxSavingsMock = filteredReports.length > 0
+        ? Math.max(...filteredReports.map(r => r.saved))
+        : 0
+
+      return {
+        totalSaved: totalSavedMock,
+        averageSpending: averageSpendingMock,
+        maxSavings: maxSavingsMock
+      }
+    }
+  }, [reportsData, trendsData, filteredReports])
 
   const handlePeriodChange = (value: string | null) => {
     if (value) {
-      setSelectedPeriod(value as '3m' | '6m' | '1y')
+      const newPeriod = value as '3m' | '6m' | '1y'
+      setSelectedPeriod(newPeriod)
+      setCurrentPeriod(newPeriod)
     }
   }
 
   return (
-    <Container size="lg" py="xl">
+    <Container size="lg" py="xl" style={{ position: 'relative' }}>
+      <LoadingOverlay visible={loading} />
+
       <Group justify="space-between" mb="lg">
         <Title order={2}>Relatórios Financeiros</Title>
         <Group>
@@ -95,6 +169,13 @@ export function ReportsScreen() {
           </Button>
         </Group>
       </Group>
+
+      {/* Erro */}
+      {error && (
+        <Alert color="red" icon={<IconInfoCircle size={16} />} mb="md">
+          {error}
+        </Alert>
+      )}
 
       <Grid mb="xl">
         <Grid.Col span={{ base: 12, md: 4 }}>

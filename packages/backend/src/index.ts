@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import dashboardRoutes from './routes/dashboard';
 import subscriptionsRoutes from './routes/subscriptions';
+import historyRoutes from './routes/history';
+import reportsRoutes from './routes/reports';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { seedData } from './utils/seedData';
 
@@ -23,6 +25,8 @@ app.use(express.urlencoded({ extended: true }));
 // Rotas
 app.use('/api', dashboardRoutes);
 app.use('/api', subscriptionsRoutes);
+app.use('/api', historyRoutes);
+app.use('/api', reportsRoutes);
 
 // Rota de saúde
 app.get('/health', (req, res) => {

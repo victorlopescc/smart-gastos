@@ -156,7 +156,6 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const setSubscriptions = useCallback((subscriptions: Subscription[]) => {
     // Esta função agora é apenas para compatibilidade
     // As assinaturas são gerenciadas pelo SubscriptionsContext
-    console.log('Assinaturas agora são gerenciadas pelo SubscriptionsContext')
   }, [])
 
   // Adicionar despesa

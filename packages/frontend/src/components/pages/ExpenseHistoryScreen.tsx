@@ -21,8 +21,9 @@ import { useAlerts } from '../../hooks/useAlerts.ts'
 import { useAuth } from '../../hooks/useAuth.ts'
 import { useTheme } from '../../hooks/useTheme.ts'
 import { categories as categoryColors, recentExpenses, historicalExpenses } from '../../data/mockData.ts'
-import { createAmountChangeHandler, parseCurrencyToNumber } from '../../utils/formatters.ts'
+import { createAmountChangeHandler, parseCurrencyToNumber, formatCurrency } from '../../utils/formatters.ts'
 import type { Expense } from '../../types'
+import { useHistory } from '../../hooks/useHistory'
 
 // Extendendo o tipo Expense para incluir propriedades de identificação
 interface ExtendedExpense extends Expense {
@@ -38,6 +39,13 @@ export function ExpenseHistoryScreen() {
   const { addedExpenses, editExpense, deleteExpense, getSubscriptionExpenses, monthlyData } = useDashboard()
   const { setDashboardData, setExpenses } = useReports()
   const { processExpenseAlerts } = useAlerts()
+
+  // Hook de histórico integrado com API (para dados reais quando disponível)
+  const { expenses: apiExpenses, loading: apiLoading } = useHistory()
+
+  // Estado para armazenar as despesas de assinaturas
+  const [subscriptionExpenses, setSubscriptionExpenses] = useState<Expense[]>([])
+
   const [searchTerm, setSearchTerm] = useState('')
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null)
   const [startDate, setStartDate] = useState('')
@@ -64,17 +72,25 @@ export function ExpenseHistoryScreen() {
     'Outros'
   ]
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(value)
-  }
-
   const getCategoryColor = (categoryName: string) => {
     const category = categoryColors.find(cat => cat.name === categoryName)
     return category ? category.color : '#868E96'
   }
+
+  // Carregar despesas de assinaturas quando o componente monta
+  useEffect(() => {
+    const loadSubscriptionExpenses = async () => {
+      try {
+        const expenses = await getSubscriptionExpenses()
+        setSubscriptionExpenses(expenses)
+      } catch (error) {
+        console.error('Erro ao carregar despesas de assinaturas:', error)
+        setSubscriptionExpenses([])
+      }
+    }
+
+    loadSubscriptionExpenses()
+  }, [getSubscriptionExpenses])
 
   // Integração automática com Reports e Alerts (invisível ao usuário)
   useEffect(() => {
@@ -87,10 +103,9 @@ export function ExpenseHistoryScreen() {
   // Sincronizar gastos com reports
   useEffect(() => {
     // Combinar gastos manuais com gastos de assinaturas para relatórios completos
-    const subscriptionExpenses = getSubscriptionExpenses()
     const allExpenses = [...addedExpenses, ...subscriptionExpenses]
     setExpenses(allExpenses)
-  }, [addedExpenses, setExpenses, getSubscriptionExpenses])
+  }, [addedExpenses, subscriptionExpenses, setExpenses])
 
   // Processar alertas quando gastos mudam
   useEffect(() => {
@@ -99,15 +114,21 @@ export function ExpenseHistoryScreen() {
     }
   }, [addedExpenses, monthlyData, processExpenseAlerts])
 
-  // Função para obter histórico completo (gastos manuais + assinaturas + histórico)
+  // Função para obter histórico completo (gastos manuais + assinaturas + histórico + API)
   const getCompleteExpenseHistory = useMemo((): ExtendedExpense[] => {
-    const subscriptionExpenses = getSubscriptionExpenses()
+    // Usar dados da API se disponíveis, senão usar dados mock para conta de teste
+    let baseExpenses = []
+    if (apiExpenses && apiExpenses.length > 0) {
+      // Dados reais da API
+      baseExpenses = apiExpenses
+    } else {
+      // Apenas incluir dados históricos se for a conta de teste
+      const historicalData = user?.email === 'teste@exemplo.com' ? [...historicalExpenses, ...recentExpenses] : []
+      baseExpenses = historicalData
+    }
 
-    // Apenas incluir dados históricos se for a conta de teste
-    const historicalData = user?.email === 'teste@exemplo.com' ? [...historicalExpenses, ...recentExpenses] : []
-
-    // Combinar todos os gastos: adicionados pelo usuário + assinaturas + histórico (apenas para conta teste)
-    const allExpenses = [...addedExpenses, ...subscriptionExpenses, ...historicalData]
+    // Combinar todos os gastos: adicionados pelo usuário + assinaturas + dados base
+    const allExpenses = [...addedExpenses, ...subscriptionExpenses, ...baseExpenses]
 
     // Adicionar flag para identificar origem (sem alterar visual)
     return allExpenses.map(expense => ({
@@ -116,7 +137,7 @@ export function ExpenseHistoryScreen() {
       isHistorical: expense.id >= 101 && expense.id <= 305, // IDs históricos
       isEditable: expense.id < 100000 || addedExpenses.some(e => e.id === expense.id) // Apenas gastos adicionados manualmente são editáveis
     }))
-  }, [addedExpenses, getSubscriptionExpenses, user])
+  }, [addedExpenses, subscriptionExpenses, user, apiExpenses])
 
   // Atualizar filteredExpenses para usar histórico completo quando não há filtros específicos
   const filteredExpenses = useMemo((): ExtendedExpense[] => {
@@ -202,12 +223,6 @@ export function ExpenseHistoryScreen() {
 
         setEditOpened(false)
         setEditingExpense(null)
-        setFormData({
-          description: '',
-          category: '',
-          amount: '',
-          date: ''
-        })
       }
     }
   }
@@ -217,7 +232,7 @@ export function ExpenseHistoryScreen() {
     setDeleteOpened(true)
   }
 
-  const confirmDeleteExpense = () => {
+  const confirmDelete = () => {
     if (expenseToDelete) {
       deleteExpense(expenseToDelete.id)
       setDeleteOpened(false)
@@ -225,308 +240,208 @@ export function ExpenseHistoryScreen() {
     }
   }
 
-  const handleAmountChange = createAmountChangeHandler(setFormData)
-
-  const totalFilteredExpenses = filteredExpenses.reduce((sum: number, expense: ExtendedExpense) => sum + expense.amount, 0)
-
   return (
-    <>
-      <Stack gap="lg">
-        <Card shadow="sm" padding="lg" radius="md" withBorder>
-          <Text size="xl" fw={600} mb="lg">Histórico de Gastos</Text>
+    <Stack gap="md">
+      {/* Cabeçalho */}
+      <Group justify="space-between">
+        <Text size="xl" fw={700}>
+          Histórico de Gastos
+        </Text>
+      </Group>
 
-          {/* Filtros - Ocultos no mobile */}
-          {!isMobile && (
-            <Card
-              shadow="xs"
-              padding="md"
-              radius="md"
-              withBorder
-              mb="lg"
-              style={{
-                backgroundColor: isDark ? '#2e2e2e' : '#f8f9fa',
-                borderColor: isDark ? '#404040' : '#dee2e6'
-              }}
-            >
-              <Text size="sm" fw={500} mb="md" c={isDark ? 'gray.3' : 'dimmed'}>Filtros</Text>
+      {/* Filtros */}
+      <Card padding="md">
+        <Text size="lg" fw={600} mb="md">
+          <IconFilter size={20} style={{ marginRight: 8 }} />
+          Filtros
+        </Text>
 
-              <Group grow align="flex-end">
-                <TextInput
-                  label="Buscar por descrição"
-                  placeholder="Digite a descrição do gasto..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  leftSection={<IconSearch size={16} />}
-                  styles={{
-                    label: { color: isDark ? '#c1c2c5' : undefined },
-                    input: {
-                      backgroundColor: isDark ? '#1a1b1e' : undefined,
-                      borderColor: isDark ? '#373a40' : undefined,
-                      color: isDark ? '#c1c2c5' : undefined,
-                      '&::placeholder': {
-                        color: isDark ? '#868e96' : undefined
-                      }
-                    }
-                  }}
-                />
+        <Group grow mb="md">
+          <TextInput
+            placeholder="Buscar por descrição..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            leftSection={<IconSearch size={16} />}
+          />
 
-                <Select
-                  label="Categoria"
-                  placeholder="Todas as categorias"
-                  data={categories}
-                  value={categoryFilter}
-                  onChange={setCategoryFilter}
-                  clearable
-                  leftSection={<IconFilter size={16} />}
-                  searchable={false}
-                  allowDeselect={true}
-                  withCheckIcon={false}
-                  comboboxProps={{
-                    transitionProps: { duration: 0 },
-                    shadow: 'md',
-                    withinPortal: false
-                  }}
-                  styles={{
-                    label: { color: isDark ? '#c1c2c5' : undefined },
-                    input: {
-                      backgroundColor: isDark ? '#1a1b1e' : undefined,
-                      borderColor: isDark ? '#373a40' : undefined,
-                      color: isDark ? '#c1c2c5' : undefined
-                    },
-                    dropdown: {
-                      backgroundColor: isDark ? '#1a1b1e' : undefined,
-                      borderColor: isDark ? '#373a40' : undefined
-                    },
-                    option: {
-                      backgroundColor: isDark ? '#1a1b1e' : undefined,
-                      color: isDark ? '#c1c2c5' : undefined,
-                      '&[data-selected]': {
-                        backgroundColor: isDark ? '#339af0' : undefined
-                      },
-                      '&[data-hovered]': {
-                        backgroundColor: isDark ? '#2e2e2e' : undefined
-                      }
-                    }
-                  }}
-                />
+          <Select
+            placeholder="Filtrar por categoria"
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            data={[
+              { value: 'all', label: 'Todas as categorias' },
+              ...categories.map(cat => ({ value: cat, label: cat }))
+            ]}
+            clearable
+          />
+        </Group>
 
-                <TextInput
-                  label="Data de"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  styles={{
-                    label: { color: isDark ? '#c1c2c5' : undefined },
-                    input: {
-                      backgroundColor: isDark ? '#1a1b1e' : undefined,
-                      borderColor: isDark ? '#373a40' : undefined,
-                      color: isDark ? '#c1c2c5' : undefined,
-                      colorScheme: isDark ? 'dark' : 'light'
-                    }
-                  }}
-                />
+        <Group grow mb="md">
+          <TextInput
+            type="date"
+            label="Data início"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
 
-                <TextInput
-                  label="Data até"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  styles={{
-                    label: { color: isDark ? '#c1c2c5' : undefined },
-                    input: {
-                      backgroundColor: isDark ? '#1a1b1e' : undefined,
-                      borderColor: isDark ? '#373a40' : undefined,
-                      color: isDark ? '#c1c2c5' : undefined,
-                      colorScheme: isDark ? 'dark' : 'light'
-                    }
-                  }}
-                />
+          <TextInput
+            type="date"
+            label="Data fim"
+            value={endDate}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+        </Group>
 
-                <Button
-                  variant="outline"
-                  onClick={clearFilters}
-                  color="#0ca167"
-                  styles={{
-                    root: {
-                      borderColor: '#0ca167',
-                      color: '#0ca167',
-                      '&:hover': {
-                        backgroundColor: isDark ? 'rgba(12, 161, 103, 0.1)' : 'rgba(12, 161, 103, 0.05)'
-                      }
-                    }
-                  }}
-                >
-                  Limpar Filtros
-                </Button>
-              </Group>
-            </Card>
-          )}
+        <Group>
+          <Button onClick={clearFilters} variant="light">
+            Limpar Filtros
+          </Button>
+        </Group>
+      </Card>
 
-          {/* Resumo dos resultados */}
-          <Group justify="space-between" mb="md">
-            <Text size="sm" c="dimmed">
-              {filteredExpenses.length} gasto(s) encontrado(s)
-            </Text>
-            <Text size="sm" fw={500} c="red">
-              Total: {formatCurrency(totalFilteredExpenses)}
-            </Text>
-          </Group>
+      {/* Tabela de gastos */}
+      <Card padding="md">
+        <Text size="lg" fw={600} mb="md">
+          Gastos ({filteredExpenses.length} encontrados)
+        </Text>
 
-          {/* Tabela de gastos */}
-          <ScrollArea type="auto">
-            <Table striped highlightOnHover style={{ minWidth: 700 }}>
-              <Table.Thead>
-                <Table.Tr>
-                  <Table.Th>Data</Table.Th>
-                  <Table.Th>Descrição</Table.Th>
-                  <Table.Th>Categoria</Table.Th>
-                  <Table.Th>Valor</Table.Th>
-                  <Table.Th>Ações</Table.Th>
-                </Table.Tr>
-              </Table.Thead>
-              <Table.Tbody>
-                {filteredExpenses.length > 0 ? (
-                  filteredExpenses.map((expense: ExtendedExpense) => (
-                    <Table.Tr key={expense.id}>
+        <ScrollArea>
+          <Table striped highlightOnHover>
+            <Table.Thead>
+              <Table.Tr>
+                <Table.Th>Data</Table.Th>
+                <Table.Th>Descrição</Table.Th>
+                <Table.Th>Categoria</Table.Th>
+                <Table.Th>Valor</Table.Th>
+                <Table.Th>Ações</Table.Th>
+              </Table.Tr>
+            </Table.Thead>
+            <Table.Tbody>
+              {filteredExpenses.length > 0 ? (
+                filteredExpenses.map((expense, index) => {
+                  const uniqueKey = `${expense.id}-${index}-${expense.date}`
+                  const isEditable = expense.isEditable !== false && !expense.isSubscription
+
+                  return (
+                    <Table.Tr key={uniqueKey}>
                       <Table.Td>
                         {new Date(expense.date).toLocaleDateString('pt-BR')}
                       </Table.Td>
                       <Table.Td>
-                        <Text size="sm" fw={500}>
-                          {expense.description}
-                        </Text>
+                        {expense.description}
+                        {expense.isSubscription && (
+                          <Badge size="xs" color="blue" ml="xs">
+                            Assinatura
+                          </Badge>
+                        )}
+                        {expense.isHistorical && (
+                          <Badge size="xs" color="gray" ml="xs">
+                            Histórico
+                          </Badge>
+                        )}
                       </Table.Td>
                       <Table.Td>
                         <Badge
-                          variant="light"
-                          size="sm"
-                          style={{ backgroundColor: getCategoryColor(expense.category) + '20', color: getCategoryColor(expense.category) }}
+                          style={{ backgroundColor: getCategoryColor(expense.category) }}
+                          variant="filled"
                         >
                           {expense.category}
                         </Badge>
                       </Table.Td>
                       <Table.Td>
-                        <Text c="red" fw={500}>
+                        <Text fw={600} c="red">
                           {formatCurrency(expense.amount)}
                         </Text>
                       </Table.Td>
                       <Table.Td>
                         <Group gap="xs">
-                          {/* Só permitir edição/exclusão de gastos manuais, não de assinaturas */}
-                          {expense.isEditable && (
+                          {isEditable && (
                             <>
                               <ActionIcon
-                                size="sm"
-                                color="#0ca167"
-                                variant="subtle"
+                                variant="light"
+                                color="blue"
                                 onClick={() => handleEditExpense(expense)}
                               >
                                 <IconEdit size={16} />
                               </ActionIcon>
                               <ActionIcon
-                                size="sm"
+                                variant="light"
                                 color="red"
-                                variant="subtle"
                                 onClick={() => handleDeleteExpense(expense)}
                               >
                                 <IconTrash size={16} />
                               </ActionIcon>
                             </>
                           )}
-                          {expense.isSubscription && (
-                            <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
-                              Assinatura
-                            </Text>
-                          )}
-                          {expense.isHistorical && (
-                            <Text size="xs" c="dimmed" style={{ fontStyle: 'italic' }}>
-                              Histórico
-                            </Text>
-                          )}
                         </Group>
                       </Table.Td>
                     </Table.Tr>
-                  ))
-                ) : (
-                  <Table.Tr>
-                    <Table.Td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
-                      <Text c="dimmed">
-                        {searchTerm || categoryFilter || startDate || endDate
-                          ? 'Nenhum gasto encontrado com os filtros aplicados'
-                          : 'Nenhum gasto registrado ainda. Comece adicionando um gasto!'
-                        }
-                      </Text>
-                    </Table.Td>
-                  </Table.Tr>
-                )}
-              </Table.Tbody>
-            </Table>
-          </ScrollArea>
-        </Card>
-      </Stack>
+                  )
+                })
+              ) : (
+                <Table.Tr>
+                  <Table.Td colSpan={5} style={{ textAlign: 'center', padding: '2rem' }}>
+                    <Text c="dimmed">
+                      {searchTerm || categoryFilter || startDate || endDate
+                        ? 'Nenhum gasto encontrado com os filtros aplicados'
+                        : 'Nenhum gasto registrado ainda. Comece adicionando um gasto!'
+                      }
+                    </Text>
+                  </Table.Td>
+                </Table.Tr>
+              )}
+            </Table.Tbody>
+          </Table>
+        </ScrollArea>
+      </Card>
 
-      {/* Modal para editar gasto */}
+      {/* Modal de edição */}
       <Modal
         opened={editOpened}
         onClose={() => setEditOpened(false)}
-        title="Editar Gasto"
-        size="md"
-        centered
+        title="Editar Despesa"
       >
-        <TextInput
-          label="Descrição"
-          placeholder="Ex: Supermercado, Uber, Restaurante..."
-          value={formData.description}
-          onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-          mb="md"
-          required
-        />
+        <Stack>
+          <TextInput
+            label="Descrição"
+            value={formData.description}
+            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            required
+          />
 
-        <Select
-          label="Categoria"
-          placeholder="Selecione uma categoria"
-          data={categories}
-          value={formData.category}
-          onChange={(value) => setFormData(prev => ({ ...prev, category: value || '' }))}
-          mb="md"
-          required
-          searchable={false}
-          allowDeselect={false}
-          withCheckIcon={false}
-          comboboxProps={{
-            transitionProps: { duration: 0 },
-            shadow: 'md',
-            withinPortal: false
-          }}
-        />
+          <Select
+            label="Categoria"
+            value={formData.category}
+            onChange={(value) => setFormData({ ...formData, category: value || '' })}
+            data={categories}
+            required
+          />
 
-        <TextInput
-          label="Valor"
-          placeholder="0,00"
-          value={formData.amount}
-          onChange={handleAmountChange}
-          type="text"
-          mb="md"
-          required
-        />
+          <TextInput
+            label="Valor (R$)"
+            value={formData.amount}
+            onChange={createAmountChangeHandler(setFormData)}
+            placeholder="0,00"
+            required
+          />
 
-        <TextInput
-          label="Data"
-          type="date"
-          value={formData.date}
-          onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-          mb="md"
-          required
-        />
+          <TextInput
+            type="date"
+            label="Data"
+            value={formData.date}
+            onChange={(e) => setFormData({ ...formData, date: e.target.value })}
+            required
+          />
 
-        <Group justify="flex-end">
-          <Button variant="outline" onClick={() => setEditOpened(false)} color="#0ca167">
-            Cancelar
-          </Button>
-          <Button onClick={handleSaveEdit} color="#0ca167">
-            Salvar Alterações
-          </Button>
-        </Group>
+          <Group justify="end">
+            <Button variant="light" onClick={() => setEditOpened(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              Salvar
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
 
       {/* Modal de confirmação de exclusão */}
@@ -534,40 +449,25 @@ export function ExpenseHistoryScreen() {
         opened={deleteOpened}
         onClose={() => setDeleteOpened(false)}
         title="Confirmar Exclusão"
-        size="sm"
-        centered
       >
-        <Text size="sm" mb="md">
-          Tem certeza que deseja excluir este gasto?
-        </Text>
+        <Stack>
+          <Text>
+            Tem certeza que deseja excluir a despesa "{expenseToDelete?.description}"?
+          </Text>
+          <Text size="sm" c="dimmed">
+            Esta ação não pode ser desfeita.
+          </Text>
 
-        {expenseToDelete && (
-          <Card mb="md" p="sm" withBorder style={{ backgroundColor: '#f8f9fa' }}>
-            <Text size="sm" fw={500} mb="xs">
-              {expenseToDelete.description}
-            </Text>
-            <Text size="xs" c="dimmed" mb="xs">
-              {expenseToDelete.category} • {new Date(expenseToDelete.date).toLocaleDateString('pt-BR')}
-            </Text>
-            <Text size="sm" c="red" fw={500}>
-              {formatCurrency(expenseToDelete.amount)}
-            </Text>
-          </Card>
-        )}
-
-        <Text size="xs" c="dimmed" mb="md">
-          Esta ação não pode ser desfeita.
-        </Text>
-
-        <Group justify="flex-end">
-          <Button variant="outline" onClick={() => setDeleteOpened(false)} color="#0ca167">
-            Cancelar
-          </Button>
-          <Button onClick={confirmDeleteExpense} color="red">
-            Excluir Gasto
-          </Button>
-        </Group>
+          <Group justify="end">
+            <Button variant="light" onClick={() => setDeleteOpened(false)}>
+              Cancelar
+            </Button>
+            <Button color="red" onClick={confirmDelete}>
+              Excluir
+            </Button>
+          </Group>
+        </Stack>
       </Modal>
-    </>
+    </Stack>
   )
 }
